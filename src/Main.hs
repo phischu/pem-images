@@ -17,14 +17,15 @@ data ImageError =
 filesInDirectory :: (MonadIO m) => FilePath -> Producer FilePath m ()
 filesInDirectory directorypath = do
     directorycontents <- liftIO (getDirectoryContents directorypath)
-    each directorycontents >-> Pipes.filterM (liftIO . doesFileExist . (directorypath </>))
+    each directorycontents >-> Pipes.map (directorypath </>) >-> Pipes.filterM (liftIO . doesFileExist)
 
-loadImage :: (MonadIO m) => FilePath -> EitherT ImageError m (Image PixelRGB8)
+loadImage :: (MonadIO m) => FilePath -> EitherT ImageError m (Image Pixel8)
 loadImage imagepath = do
-    eitherdynamicimage <- liftIO (readImage imagepath)
+    eitherdynamicimage <- liftIO (readBitmap imagepath)
     case eitherdynamicimage of
         Left readimageerror -> left (ReadImageError readimageerror)
-        Right (ImageRGB8 image) -> return image
+        Right (ImageRGB8 image) -> return (chooseChannel image)
+        Right (ImageY8 image) -> return image
         _ -> left ImageFormatError
 
 chooseChannel ::Image PixelRGB8 -> Image Pixel8
@@ -42,6 +43,8 @@ testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
 main :: IO ()
-main = runEffect (
+main = runEitherT (runEffect (
     filesInDirectory testdirectory >->
-    Pipes.print)
+    Pipes.mapM loadImage >->
+    Pipes.map gatherRowData >->
+    Pipes.print)) >>= print
