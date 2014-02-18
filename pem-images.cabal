@@ -17,7 +17,9 @@ cabal-version:       >=1.10
 
 executable pem-images
   main-is:             Main.hs
-  -- other-modules:       
+  other-modules:       ImageQuery,
+                       ImageLoading,
+                       ImageProcessing
   -- other-extensions:    
   build-depends:       base >=4.6 && <4.7,
                        pipes >=4.1.0 && < 4.2,
