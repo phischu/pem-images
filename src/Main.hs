@@ -1,22 +1,25 @@
 module Main where
 
-import ImageLoading (imageSeries)
-import ImageQuery (ImageQuery(ValueInPoint),runImageQueries)
+import ImageLoading (imageSeries,ImageLoadingError)
+import ImageQuery (ImageQuery(ImageQuery),runImageQuery,ImageQueryAccumulator)
 
-import Pipes (runEffect,(>->))
+import Codec.Picture (Image,Pixel8)
+
+import Pipes (Producer,runEffect,(>->),hoist,lift)
 import qualified Pipes.Prelude as Pipes
 import Data.Vector (Vector)
 import Data.Vector as V (fromList)
-import Control.Error (runEitherT)
+import Control.Error (EitherT,runEitherT)
+import Control.Monad.Trans.State (StateT,runStateT)
 
 testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
-testqueries :: Vector ImageQuery
-testqueries = V.fromList [ValueInPoint 20 20]
+testquery :: ImageQuery
+testquery = undefined
 
 main :: IO ()
-main = runEitherT (runEffect (
-    imageSeries testdirectory >->
-    Pipes.map (runImageQueries testqueries) >->
-    Pipes.print)) >>= print
+main = runStateT undefined (runEitherT (runEffect (
+    let produ = hoist (hoist lift) (imageSeries testdirectory) :: Producer (Image Pixel8) (EitherT ImageLoadingError (StateT ImageQueryAccumulator IO)) ()
+        consu = hoist lift (runImageQuery testquery) in
+    produ >-> consu))) >>= print
