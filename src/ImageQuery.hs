@@ -4,8 +4,7 @@ import ImageProcessing (valueInPoint)
 
 import Codec.Picture (Image,Pixel8,PixelF)
 
-import Pipes (Consumer)
-import Control.Monad.Trans.State (StateT)
+import Control.Foldl (Fold)
 
 import Data.Vector (Vector)
 import Data.Vector as V (map)
@@ -28,26 +27,13 @@ data LineQuery =
         end :: Int,
         height :: Int} deriving Show
 
-data ImageQueryAccumulator = ImageQueryAccumulator {
+data ImageQueryResult = ImageQueryResult {
     tableRows :: [Vector Double],
     lineValues :: [Vector Pixel8],
-    sumImage :: Image PixelF,
-    numberOfImages :: Integer}
+    averageImage :: (Maybe (Image PixelF))}
 
-data ImageQueryResult = ImageQueryResult [Vector Double] [Vector Pixel8] (Maybe (Image PixelF))
-
-runImageQuery :: ImageQuery -> Consumer (Image Pixel8) (StateT ImageQueryAccumulator m) ()
+runImageQuery :: ImageQuery -> Fold (Image Pixel8) ImageQueryResult
 runImageQuery = undefined
-
-imageQueryStep :: ImageQuery -> ImageQueryAccumulator -> Image Pixel8 -> ImageQueryAccumulator
-imageQueryStep imagequery accumulator image = ImageQueryAccumulator
-    (runTableQueries (tableQueries imagequery) image : tableRows accumulator)
-    (runLineQuery (lineQuery imagequery) image : lineValues accumulator)
-    (addImage (sumImage accumulator) image)
-    (numberOfImages accumulator + 1)
-
-finalizeImageQuery :: ImageQueryAccumulator -> ImageQueryResult
-finalizeImageQuery = undefined
 
 runTableQuery :: TableQuery -> Image Pixel8 -> Double
 runTableQuery (ValueInPoint x y) image = valueInPoint x y image

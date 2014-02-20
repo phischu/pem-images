@@ -1,11 +1,13 @@
 module Main where
 
 import ImageLoading (imageSeries,ImageLoadingError)
-import ImageQuery (ImageQuery(ImageQuery),runImageQuery,ImageQueryAccumulator)
+import ImageQuery (ImageQuery(ImageQuery),runImageQuery,ImageQueryResult(tableRows))
 
 import Codec.Picture (Image,Pixel8)
 
 import Pipes (Producer,runEffect,(>->),hoist,lift)
+import Control.Foldl (purely)
+import Pipes.Prelude (fold)
 import qualified Pipes.Prelude as Pipes
 import Data.Vector (Vector)
 import Data.Vector as V (fromList)
@@ -19,7 +21,4 @@ testquery :: ImageQuery
 testquery = undefined
 
 main :: IO ()
-main = runStateT undefined (runEitherT (runEffect (
-    let produ = hoist (hoist lift) (imageSeries testdirectory) :: Producer (Image Pixel8) (EitherT ImageLoadingError (StateT ImageQueryAccumulator IO)) ()
-        consu = hoist lift (runImageQuery testquery) in
-    produ >-> consu))) >>= print
+main = runEitherT (purely fold (runImageQuery testquery) (imageSeries testdirectory)) >>= either print (print . tableRows)
