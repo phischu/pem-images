@@ -1,6 +1,6 @@
 module ImageQuery where
 
-import ImageProcessing (valueInPoint)
+import ImageProcessing (valueInPoint,horizontalLine,verticalLine)
 
 import Codec.Picture (Image,Pixel8,PixelF)
 
@@ -8,7 +8,7 @@ import Control.Foldl (Fold(Fold),list,premap)
 import Control.Applicative ((<$>),(<*>))
 
 import Data.Vector (Vector)
-import Data.Vector as V (map)
+import Data.Vector as Vector (map)
 
 data ImageQuery = ImageQuery {
     tableQueries :: Vector TableQuery,
@@ -20,13 +20,13 @@ data TableQuery =
 
 data LineQuery =
     HorizontalLine {
-        start :: Int,
-        end :: Int,
-        width:: Int} |
+        fromX :: Int,
+        fromY :: Int,
+        toX :: Int} |
     VerticalLine {
-        start :: Int,
-        end :: Int,
-        height :: Int} deriving Show
+        fromX :: Int,
+        fromY :: Int,
+        toY :: Int} deriving Show
 
 data ImageQueryResult = ImageQueryResult {
     tableRows :: [Vector Double],
@@ -47,16 +47,17 @@ runTableQuery :: TableQuery -> Image Pixel8 -> Double
 runTableQuery (ValueInPoint x y) image = valueInPoint x y image
 
 runTableQueries :: Vector TableQuery -> Image Pixel8 -> Vector Double
-runTableQueries tablequeries image = V.map (flip runTableQuery image) tablequeries
+runTableQueries tablequeries image = Vector.map (flip runTableQuery image) tablequeries
 
 lineFold :: Vector LineQuery -> Fold (Image Pixel8) [Vector (Vector Pixel8)]
 lineFold linequeries = premap (runLineQueries linequeries) list
 
 runLineQuery :: LineQuery -> Image Pixel8 -> Vector Pixel8
-runLineQuery = undefined
+runLineQuery (HorizontalLine fromx fromy tox) image = horizontalLine fromx fromy tox image
+runLineQuery (VerticalLine fromx fromy toy) image = verticalLine fromx fromy toy image
 
 runLineQueries :: Vector LineQuery -> Image Pixel8 -> Vector (Vector Pixel8)
-runLineQueries = undefined
+runLineQueries linequeries image = Vector.map (flip runLineQuery image) linequeries
 
 averageImageFold :: Bool -> Fold (Image Pixel8) (Maybe (Image PixelF))
 averageImageFold False = Fold const () (const Nothing)

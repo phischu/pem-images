@@ -2,8 +2,8 @@ module Main where
 
 import ImageLoading (imageSeries)
 import ImageQuery (
-    ImageQuery(ImageQuery),TableQuery(ValueInPoint),
-    runImageQuery,ImageQueryResult(tableRows))
+    ImageQuery(ImageQuery),TableQuery(ValueInPoint),LineQuery(HorizontalLine),
+    runImageQuery,ImageQueryResult(tableRows,lineValues))
 
 import Pipes ((>->))
 import Control.Foldl (purely)
@@ -16,8 +16,14 @@ testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
 testquery :: ImageQuery
-testquery = ImageQuery (V.fromList [ValueInPoint 20 20]) (V.fromList []) False
+testquery = ImageQuery (V.fromList [ValueInPoint 20 20]) (V.fromList [HorizontalLine (-3) 14 12]) False
 
 main :: IO ()
-main = runEitherT (purely fold (runImageQuery testquery) (
-    imageSeries testdirectory >-> Pipes.take 20)) >>= either print (print . tableRows)
+main = do
+    result <- runEitherT (purely fold (runImageQuery testquery)
+        (imageSeries testdirectory >-> Pipes.take 20))
+    case result of
+        Left err -> print err
+        Right imagequeryresult -> do
+            print (lineValues imagequeryresult)
+            print (tableRows imagequeryresult)
