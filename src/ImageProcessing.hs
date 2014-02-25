@@ -1,8 +1,10 @@
 module ImageProcessing where
 
 import Codec.Picture (
-    Image,Pixel,
-    imageWidth,imageHeight,pixelAt)
+    Image,Pixel,Pixel8,
+    imageWidth,imageHeight,pixelAt,
+    pixelMap,generateImage)
+import Codec.Picture.Types (Pixel32)
 
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN)
@@ -25,4 +27,17 @@ verticalLine fromx fromy toy image =
         (Vector.enumFromStepN fromy step n) where
             step = signum (toy - fromy)
             n = abs (toy - fromy + 1)
+
+addImage :: Maybe (Image Pixel32) -> Image Pixel8 -> Maybe (Image Pixel32)
+addImage Nothing image = Just (pixelMap fromIntegral image)
+addImage (Just accuImage) image = Just (generateImage generatingFunction width height) where
+    width = imageWidth accuImage
+    height = imageHeight accuImage
+    generatingFunction x y = pixelAt accuImage x y + fromIntegral (pixelAt image x y)
+
+finalizeAverageImage :: (Maybe (Image Pixel32)) -> Int -> Maybe (Image Pixel8)
+finalizeAverageImage Nothing _ = Nothing
+finalizeAverageImage (Just image) n
+    | n <= 0 = Nothing
+    | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
 

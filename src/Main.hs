@@ -3,7 +3,9 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQuery(ImageQuery),TableQuery(ValueInPoint),LineQuery(HorizontalLine),
-    runImageQuery,ImageQueryResult(tableRows,lineValues))
+    runImageQuery,ImageQueryResult(tableRows,lineValues,averageImage))
+
+import Codec.Picture (writeBitmap)
 
 import Pipes ((>->))
 import Control.Foldl (purely)
@@ -16,7 +18,7 @@ testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
 testquery :: ImageQuery
-testquery = ImageQuery (V.fromList [ValueInPoint 20 20]) (V.fromList [HorizontalLine (-3) 14 12]) False
+testquery = ImageQuery (V.fromList [ValueInPoint 20 20]) (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
 main = do
@@ -27,3 +29,4 @@ main = do
         Right imagequeryresult -> do
             print (lineValues imagequeryresult)
             print (tableRows imagequeryresult)
+            maybe (putStrLn "no average image") (writeBitmap "average_image.bmp") (averageImage imagequeryresult)
