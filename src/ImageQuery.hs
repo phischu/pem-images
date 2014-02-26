@@ -1,8 +1,9 @@
 module ImageQuery where
 
 import ImageProcessing (
-    valueInPoint,horizontalLine,verticalLine,
-    addImage,finalizeAverageImage)
+    valueInPoint,numberOfIslands,
+    horizontalLine,verticalLine,
+    addImage,finalizeAverageImage,)
 
 import Codec.Picture (Image,Pixel8)
 import Codec.Picture.Types (Pixel32)
@@ -20,7 +21,8 @@ data ImageQuery = ImageQuery {
     averageImageQuery :: Bool} deriving Show
     
 data TableQuery =
-    ValueInPoint Int Int deriving Show
+    ValueInPoint Int Int |
+    NumberOfIslands deriving Show
 
 data LineQuery =
     HorizontalLine {
@@ -49,6 +51,7 @@ tableFold tablequeries = Fold.premap (runTableQueries tablequeries) Fold.list
 
 runTableQuery :: TableQuery -> Image Pixel8 -> Double
 runTableQuery (ValueInPoint x y) image = valueInPoint x y image
+runTableQuery NumberOfIslands image = numberOfIslands image
 
 runTableQueries :: Vector TableQuery -> Image Pixel8 -> Vector Double
 runTableQueries tablequeries image = Vector.map (flip runTableQuery image) tablequeries

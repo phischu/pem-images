@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances,TypeFamilies #-}
 module ImageProcessing where
 
 import Codec.Picture (
@@ -6,6 +7,10 @@ import Codec.Picture (
     pixelMap,generateImage)
 import Codec.Picture.Types (Pixel32)
 
+import Data.Image (GrayImage)
+import Data.Image.Binary (toBinaryImage,label)
+import Data.Image.Internal (maxIntensity)
+
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN)
 
@@ -13,6 +18,9 @@ valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
 valueInPoint x y image
     | x < 0 || x >= imageWidth image || y < 0 || y > imageHeight image = 0
     | otherwise = fromIntegral (pixelAt image x y)
+
+numberOfIslands :: Image Pixel8 -> Double
+numberOfIslands image = maxIntensity (label (toBinaryImage (>20) (toBoxedImage image)))
 
 horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
 horizontalLine fromx fromy tox image =
@@ -41,3 +49,5 @@ finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
 
+toBoxedImage :: Image Pixel8 -> GrayImage
+toBoxedImage = undefined 
