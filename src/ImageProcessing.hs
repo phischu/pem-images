@@ -9,7 +9,7 @@ import Codec.Picture.Types (Pixel32)
 
 import Data.Image (GrayImage,makeImage)
 import Data.Image.Binary (toBinaryImage)
-import Data.Image.Internal (maxIntensity)
+import Data.Image.Internal (maxIntensity,cols,rows,ref)
 import Data.Image.Boxed (label)
 
 import Data.Vector (Vector)
@@ -52,3 +52,9 @@ finalizeAverageImage (Just image) n
 
 toBoxedImage :: Image Pixel8 -> GrayImage
 toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
+
+fromBoxedImage :: GrayImage -> Image Pixel8
+fromBoxedImage image = generateImage generatingFunction width height where
+    width = cols image
+    height = rows image
+    generatingFunction x y = floor (ref image y x * 255.0)

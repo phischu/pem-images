@@ -46,6 +46,7 @@ runImageQuery (ImageQuery tablequeries linequeries averageimagequery) =
     lineFold linequeries <*>
     averageImageFold averageimagequery
 
+
 tableFold :: Vector TableQuery -> Fold (Image Pixel8) [Vector Double]
 tableFold tablequeries = Fold.premap (runTableQueries tablequeries) Fold.list
 
@@ -56,6 +57,7 @@ runTableQuery NumberOfIslands image = numberOfIslands image
 runTableQueries :: Vector TableQuery -> Image Pixel8 -> Vector Double
 runTableQueries tablequeries image = Vector.map (flip runTableQuery image) tablequeries
 
+
 lineFold :: Vector LineQuery -> Fold (Image Pixel8) [Vector (Vector Pixel8)]
 lineFold linequeries = Fold.premap (runLineQueries linequeries) Fold.list
 
@@ -65,6 +67,7 @@ runLineQuery (VerticalLine fromx fromy toy) image = verticalLine fromx fromy toy
 
 runLineQueries :: Vector LineQuery -> Image Pixel8 -> Vector (Vector Pixel8)
 runLineQueries linequeries image = Vector.map (flip runLineQuery image) linequeries
+
 
 averageImageFold :: Bool -> Fold (Image Pixel8) (Maybe (Image Pixel8))
 averageImageFold False = Fold const () (const Nothing)
