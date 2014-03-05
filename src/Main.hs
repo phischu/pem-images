@@ -2,7 +2,7 @@ module Main where
 
 import ImageLoading (imageSeries)
 import ImageQuery (
-    ImageQuery(ImageQuery),TableQuery(ValueInPoint),LineQuery(HorizontalLine),
+    ImageQuery(ImageQuery),TableQuery(ValueInPoint,NumberOfIslands),LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineValues,averageImage))
 
 import Codec.Picture (writeBitmap)
@@ -18,7 +18,7 @@ testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
 testquery :: ImageQuery
-testquery = ImageQuery (V.fromList [ValueInPoint 20 20]) (V.fromList [HorizontalLine (-3) 14 12]) True
+testquery = ImageQuery (V.fromList [ValueInPoint 20 20,NumberOfIslands]) (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
 main = do

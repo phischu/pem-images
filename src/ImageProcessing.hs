@@ -7,9 +7,10 @@ import Codec.Picture (
     pixelMap,generateImage)
 import Codec.Picture.Types (Pixel32)
 
-import Data.Image (GrayImage)
-import Data.Image.Binary (toBinaryImage,label)
+import Data.Image (GrayImage,makeImage)
+import Data.Image.Binary (toBinaryImage)
 import Data.Image.Internal (maxIntensity)
+import Data.Image.Boxed (label)
 
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN)
@@ -50,4 +51,4 @@ finalizeAverageImage (Just image) n
     | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
 
 toBoxedImage :: Image Pixel8 -> GrayImage
-toBoxedImage = undefined 
+toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
