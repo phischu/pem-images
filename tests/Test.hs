@@ -1,6 +1,17 @@
 module Main where
 
+import ImageLoading (loadImage)
+import ImageProcessing (numberOfIslands,fromBoxedImage,toBoxedImage)
 
+import Data.Image.Binary (toBinaryImage)
+import Data.Image.Boxed (label)
+
+import Codec.Picture (writeBitmap)
+
+import Control.Error (runEitherT)
 
 main :: IO ()
-main = print "test"
+main = do
+    Right image <- runEitherT (loadImage "tests/ConnectedComponents.bmp")
+    print (numberOfIslands image)
+    writeBitmap "tests/Labels.bmp" (fromBoxedImage (label (toBinaryImage (>20) (toBoxedImage image))))

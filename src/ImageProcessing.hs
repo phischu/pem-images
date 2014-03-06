@@ -9,7 +9,7 @@ import Codec.Picture.Types (Pixel32)
 
 import Data.Image (GrayImage,makeImage)
 import Data.Image.Binary (toBinaryImage)
-import Data.Image.Internal (maxIntensity,cols,rows,ref)
+import Data.Image.Internal (maxIntensity,minIntensity,cols,rows,ref)
 import Data.Image.Boxed (label)
 
 import Data.Vector (Vector)
@@ -57,4 +57,6 @@ fromBoxedImage :: GrayImage -> Image Pixel8
 fromBoxedImage image = generateImage generatingFunction width height where
     width = cols image
     height = rows image
-    generatingFunction x y = floor (ref image y x * 255.0)
+    generatingFunction x y = floor ((ref image y x - minintensity) / intensityrange * 255.0)
+    minintensity = minIntensity image
+    intensityrange = maxIntensity image - minintensity
