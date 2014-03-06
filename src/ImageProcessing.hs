@@ -12,6 +12,11 @@ import Data.Image.Binary (toBinaryImage)
 import Data.Image.Internal (maxIntensity,minIntensity,cols,rows,ref)
 import Data.Image.Boxed (label)
 
+import Data.Graph (graphFromEdges,dff)
+import Data.Tree (flatten)
+
+import Control.Monad (guard)
+
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN)
 
@@ -21,7 +26,7 @@ valueInPoint x y image
     | otherwise = fromIntegral (pixelAt image x y)
 
 numberOfIslands :: Image Pixel8 -> Double
-numberOfIslands image = maxIntensity (label (toBinaryImage (>20) (toBoxedImage image)))
+numberOfIslands image = fromIntegral (length (connectedComponents image))
 
 horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
 horizontalLine fromx fromy tox image =
@@ -49,6 +54,16 @@ finalizeAverageImage Nothing _ = Nothing
 finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
+
+connectedComponents :: Image Pixel8 -> [[(Int,Int)]]
+connectedComponents image = map (map vertexToPosition . flatten) (dff imagegraph) where
+    vertexToPosition vertex = let (position,_,_) = vertexInfo vertex in position
+    (imagegraph,vertexInfo,_) = graphFromEdges (do
+        x <- [0..imageWidth image - 1]
+        y <- [0..imageHeight image - 1]
+        guard (pixelAt image x y /= 0)
+        let adjacentpositions = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+        return ((x,y),(x,y),adjacentpositions))
 
 toBoxedImage :: Image Pixel8 -> GrayImage
 toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
