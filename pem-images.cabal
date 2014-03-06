@@ -52,3 +52,4 @@ Test-suite test
                        errors >=1.4.5 && <1.5,
                        JuicyPixels >=3.1.5 && <3.2,
                        unm-hip >=0.3.1.6 && < 0.4
+  ghc-options:         -rtsopts -O2

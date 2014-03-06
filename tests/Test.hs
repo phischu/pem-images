@@ -14,4 +14,3 @@ main :: IO ()
 main = do
     Right image <- runEitherT (loadImage "tests/ConnectedComponents.bmp")
     print (numberOfIslands image)
-    writeBitmap "tests/Labels.bmp" (fromBoxedImage (label (toBinaryImage (>20) (toBoxedImage image))))
