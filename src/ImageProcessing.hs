@@ -12,10 +12,15 @@ import Data.Image.Binary (toBinaryImage)
 import Data.Image.Internal (maxIntensity,minIntensity,cols,rows,ref)
 import Data.Image.Boxed (label)
 
-import Data.Graph (graphFromEdges,dff)
-import Data.Tree (flatten)
+import Data.List (foldl')
+import Data.Set (Set)
+import qualified Data.Set as Set (insert)
+import qualified Data.IntMap.Strict as IntMap (empty,adjust,elems)
+import Data.Array (Array,assocs)
+import Data.Array.ST (runSTArray,newArray,readArray,writeArray)
+import Data.STRef.Strict (newSTRef,modifySTRef)
 
-import Control.Monad (guard)
+import Control.Monad (forM,when)
 
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN)
@@ -55,19 +60,35 @@ finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
 
-connectedComponents :: Image Pixel8 -> [[(Int,Int)]]
-connectedComponents image = map (map vertexToPosition . flatten) (dff imagegraph) where
-    vertexToPosition vertex = let (position,_,_) = vertexInfo vertex in position
-    (imagegraph,vertexInfo,_) = graphFromEdges [
-        ((x,y),(x,y),[(x+1,y),(x-1,y),(x,y+1),(x,y-1)]) |
-            x <- [0..imageWidth image - 1],
-            y <- [0..imageHeight image - 1]]
-    {-graphFromEdges (do
-        x <- [0..imageWidth image - 1]
-        y <- [0..imageHeight image - 1]
-        guard (pixelAt image x y /= 0)
-        let adjacentpositions = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
-        return ((x,y),(x,y),adjacentpositions))-}
+connectedComponents :: Image Pixel8 -> [Set (Int,Int)]
+connectedComponents image = accumulateComponents (labelArray image)
+
+labelArray :: Image Pixel8 -> Array (Int,Int) Int
+labelArray image = runSTArray (do
+    currentlabel <- newSTRef 1
+    let lastx = imageWidth image - 1
+        lasty = imageHeight image - 1
+    labelimage <- newArray ((0,0),(lastx,lasty)) 0
+    forM [0..lasty] (\y -> do
+        forM [0..lastx] (\x -> do
+            when (pixelAt image x y /= 0) (do
+                leftlabel <- if x <= 0 then return 0 else readArray labelimage (x-1,y)
+                upperlabel <- if y <= 0 then return 0 else readArray labelimage (x,y-1)
+                case (leftlabel,upperlabel) of
+                    (0,0) -> do
+                        writeArray labelimage (x,y) currentlabel
+                        modifySTRef currentlabel (+1)
+                    (0,_) -> do
+                        writeArray labelimage (x,y) upperlabel
+                    (_,0) -> do
+                        writeArray labelimage (x,y) leftlabel
+                    (_,_) -> undefined
+                )))
+    return labelimage)
+
+accumulateComponents :: Array (Int,Int) Int -> [Set (Int,Int)]
+accumulateComponents labelarray = IntMap.elems (foldl' insertPosition IntMap.empty (assocs labelarray)) where
+    insertPosition accumulator (position,label) = IntMap.adjust (Set.insert position) label accumulator
 
 toBoxedImage :: Image Pixel8 -> GrayImage
 toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
