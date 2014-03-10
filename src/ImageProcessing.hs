@@ -14,11 +14,12 @@ import Data.Image.Boxed (label)
 
 import Data.List (foldl')
 import Data.Set (Set)
-import qualified Data.Set as Set (insert)
-import qualified Data.IntMap.Strict as IntMap (empty,adjust,elems)
+import qualified Data.Set as Set (union,singleton)
+import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith)
 import Data.Array (Array,assocs)
 import Data.Array.ST (runSTArray,newArray,readArray,writeArray)
-import Data.STRef.Strict (newSTRef,modifySTRef)
+import Data.STRef.Strict (newSTRef,modifySTRef,readSTRef,writeSTRef)
+import qualified Data.IntDisjointSet as DisjointSet (empty,insert,union,lookup)
 
 import Control.Monad (forM,when)
 
@@ -65,10 +66,11 @@ connectedComponents image = accumulateComponents (labelArray image)
 
 labelArray :: Image Pixel8 -> Array (Int,Int) Int
 labelArray image = runSTArray (do
-    currentlabel <- newSTRef 1
+    currentlabelref <- newSTRef 1
     let lastx = imageWidth image - 1
         lasty = imageHeight image - 1
     labelimage <- newArray ((0,0),(lastx,lasty)) 0
+    disjointsetref <- newSTRef DisjointSet.empty
     forM [0..lasty] (\y -> do
         forM [0..lastx] (\x -> do
             when (pixelAt image x y /= 0) (do
@@ -76,19 +78,34 @@ labelArray image = runSTArray (do
                 upperlabel <- if y <= 0 then return 0 else readArray labelimage (x,y-1)
                 case (leftlabel,upperlabel) of
                     (0,0) -> do
+                        currentlabel <- readSTRef currentlabelref
                         writeArray labelimage (x,y) currentlabel
-                        modifySTRef currentlabel (+1)
+                        writeSTRef currentlabelref (currentlabel + 1)
+                        modifySTRef disjointsetref (DisjointSet.insert currentlabel)
                     (0,_) -> do
                         writeArray labelimage (x,y) upperlabel
                     (_,0) -> do
                         writeArray labelimage (x,y) leftlabel
-                    (_,_) -> undefined
-                )))
+                    (_,_) -> do
+                        writeArray labelimage (x,y) leftlabel
+                        modifySTRef disjointsetref (DisjointSet.union leftlabel upperlabel))))
+    forM [0..lasty] (\y -> do
+        forM [0..lastx] (\x -> do
+            currentlabel <- readArray labelimage (x,y)
+            disjointset <- readSTRef disjointsetref
+            case DisjointSet.lookup currentlabel disjointset of
+                (Nothing,disjointset') -> do
+                    writeArray labelimage (x,y) 0
+                    writeSTRef disjointsetref disjointset'
+                (Just representative,disjointset') -> do
+                    writeArray labelimage (x,y) representative
+                    writeSTRef disjointsetref disjointset'))
     return labelimage)
 
 accumulateComponents :: Array (Int,Int) Int -> [Set (Int,Int)]
 accumulateComponents labelarray = IntMap.elems (foldl' insertPosition IntMap.empty (assocs labelarray)) where
-    insertPosition accumulator (position,label) = IntMap.adjust (Set.insert position) label accumulator
+    insertPosition accumulator (position,label) =
+        IntMap.insertWith Set.union label (Set.singleton position) accumulator
 
 toBoxedImage :: Image Pixel8 -> GrayImage
 toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
