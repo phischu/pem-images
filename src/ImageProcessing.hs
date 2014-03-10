@@ -58,12 +58,16 @@ finalizeAverageImage (Just image) n
 connectedComponents :: Image Pixel8 -> [[(Int,Int)]]
 connectedComponents image = map (map vertexToPosition . flatten) (dff imagegraph) where
     vertexToPosition vertex = let (position,_,_) = vertexInfo vertex in position
-    (imagegraph,vertexInfo,_) = graphFromEdges (do
+    (imagegraph,vertexInfo,_) = graphFromEdges [
+        ((x,y),(x,y),[(x+1,y),(x-1,y),(x,y+1),(x,y-1)]) |
+            x <- [0..imageWidth image - 1],
+            y <- [0..imageHeight image - 1]]
+    {-graphFromEdges (do
         x <- [0..imageWidth image - 1]
         y <- [0..imageHeight image - 1]
         guard (pixelAt image x y /= 0)
         let adjacentpositions = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
-        return ((x,y),(x,y),adjacentpositions))
+        return ((x,y),(x,y),adjacentpositions))-}
 
 toBoxedImage :: Image Pixel8 -> GrayImage
 toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
