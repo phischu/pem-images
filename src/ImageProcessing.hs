@@ -17,9 +17,10 @@ import Data.Set (Set)
 import qualified Data.Set as Set (union,singleton)
 import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith,delete)
 import Data.Array (Array,assocs)
-import Data.Array.ST (runSTArray,newArray,readArray,writeArray)
+import Data.Array.ST (STArray,runSTArray,newArray,newArray_,readArray,writeArray)
+import Control.Monad.ST (ST)
 import Data.STRef.Strict (newSTRef,modifySTRef,readSTRef,writeSTRef)
-import qualified Data.IntDisjointSet as DisjointSet (empty,insert,union,lookup)
+import qualified Data.UnionFind.ST as UnionFind (Point,fresh,equivalent,union,descriptor)
 
 import Control.Monad (forM,when)
 
@@ -69,37 +70,35 @@ labelArray image = runSTArray (do
     currentlabelref <- newSTRef 1
     let lastx = imageWidth image - 1
         lasty = imageHeight image - 1
-    labelimage <- newArray ((0,0),(lastx,lasty)) 0
-    disjointsetref <- newSTRef DisjointSet.empty
+    zero <- UnionFind.fresh 0
+    pointimage <- newArray_ ((0,0),(lastx,lasty)) :: ST s (STArray s (Int,Int) (UnionFind.Point s Int))
     forM [0..lasty] (\y -> do
         forM [0..lastx] (\x -> do
+            writeArray pointimage (x,y) zero
             when (pixelAt image x y /= 0) (do
-                leftlabel <- if x <= 0 then return 0 else readArray labelimage (x-1,y)
-                upperlabel <- if y <= 0 then return 0 else readArray labelimage (x,y-1)
-                case (leftlabel,upperlabel) of
-                    (0,0) -> do
+                leftpoint <- if x <= 0 then return zero else readArray pointimage (x-1,y)
+                upperpoint <- if y <= 0 then return zero else readArray pointimage (x,y-1)
+                leftiszero <- UnionFind.equivalent leftpoint zero
+                upperiszero <- UnionFind.equivalent upperpoint zero
+                case (leftiszero,upperiszero) of
+                    (True,True) -> do
                         currentlabel <- readSTRef currentlabelref
-                        writeArray labelimage (x,y) currentlabel
+                        point <- UnionFind.fresh currentlabel
+                        writeArray pointimage (x,y) point
                         writeSTRef currentlabelref (currentlabel + 1)
-                        modifySTRef disjointsetref (DisjointSet.insert currentlabel)
-                    (0,_) -> do
-                        writeArray labelimage (x,y) upperlabel
-                    (_,0) -> do
-                        writeArray labelimage (x,y) leftlabel
-                    (_,_) -> do
-                        writeArray labelimage (x,y) leftlabel
-                        modifySTRef disjointsetref (DisjointSet.union leftlabel upperlabel))))
+                    (True,False) -> do
+                        writeArray pointimage (x,y) upperpoint
+                    (False,True) -> do
+                        writeArray pointimage (x,y) leftpoint
+                    (False,False) -> do
+                        writeArray pointimage (x,y) leftpoint
+                        UnionFind.union leftpoint upperpoint)))
+    labelimage <- newArray ((0,0),(lastx,lasty)) 0
     forM [0..lasty] (\y -> do
         forM [0..lastx] (\x -> do
-            currentlabel <- readArray labelimage (x,y)
-            disjointset <- readSTRef disjointsetref
-            case DisjointSet.lookup currentlabel disjointset of
-                (Nothing,disjointset') -> do
-                    writeArray labelimage (x,y) 0
-                    writeSTRef disjointsetref disjointset'
-                (Just representative,disjointset') -> do
-                    writeArray labelimage (x,y) representative
-                    writeSTRef disjointsetref disjointset'))
+            point <- readArray pointimage (x,y)
+            label <- UnionFind.descriptor point
+            writeArray labelimage (x,y) label))     
     return labelimage)
 
 accumulateComponents :: Array (Int,Int) Int -> [Set (Int,Int)]
