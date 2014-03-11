@@ -15,7 +15,7 @@ import Data.Image.Boxed (label)
 import Data.List (foldl')
 import Data.Set (Set)
 import qualified Data.Set as Set (union,singleton)
-import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith)
+import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith,delete)
 import Data.Array (Array,assocs)
 import Data.Array.ST (runSTArray,newArray,readArray,writeArray)
 import Data.STRef.Strict (newSTRef,modifySTRef,readSTRef,writeSTRef)
@@ -103,7 +103,7 @@ labelArray image = runSTArray (do
     return labelimage)
 
 accumulateComponents :: Array (Int,Int) Int -> [Set (Int,Int)]
-accumulateComponents labelarray = IntMap.elems (foldl' insertPosition IntMap.empty (assocs labelarray)) where
+accumulateComponents labelarray = IntMap.elems (IntMap.delete 0 (foldl' insertPosition IntMap.empty (assocs labelarray))) where
     insertPosition accumulator (position,label) =
         IntMap.insertWith Set.union label (Set.singleton position) accumulator
 
