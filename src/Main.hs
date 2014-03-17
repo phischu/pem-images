@@ -3,7 +3,7 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQuery(ImageQuery),
-    TableQuery(NumberOfIslands,ValueInPoint,AverageAroundPoint),
+    TableQuery(NumberOfIslands,ValueInPoint,AverageAroundPoint,AverageOfImage),
     LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
 
@@ -30,7 +30,8 @@ testtablequeries :: Vector TableQuery
 testtablequeries = V.fromList [
     NumberOfIslands,
     AverageAroundPoint 2 126 12,
-    ValueInPoint 2 126]
+    ValueInPoint 2 126,
+    AverageOfImage]
 
 testquery :: ImageQuery
 testquery = ImageQuery testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True

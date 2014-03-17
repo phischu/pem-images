@@ -7,6 +7,7 @@ import Codec.Picture (
     pixelMap,generateImage)
 import Codec.Picture.Types (
     Pixel32,
+    pixelFold,
     createMutableImage,writePixel,freezeImage)
 
 import Data.List (
@@ -41,6 +42,12 @@ averageAroundPoint x y r image = sum pixelvalues / fromIntegral (length pixelval
         dx <- [-r .. r]
         dy <- [-r .. r]
         return (valueInPoint (x+dx) (y+dy) image)
+
+averageOfImage :: (Pixel a,Integral a,Num b,Fractional b) => Image a -> b
+averageOfImage image = sumOfPixels / numberOfPixels where
+    sumOfPixels = pixelFold addPixel 0 image where
+    addPixel accumulator _ _ pixelvalue = accumulator + fromIntegral pixelvalue
+    numberOfPixels = fromIntegral (imageWidth image * imageHeight image)
 
 numberOfIslands :: Image Pixel8 -> Double
 numberOfIslands image = fromIntegral (length (connectedComponents image))
