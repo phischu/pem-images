@@ -2,7 +2,7 @@ module ImageQuery where
 
 import ImageProcessing (
     valueInPoint,numberOfIslands,
-    horizontalLine,verticalLine,
+    horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage,)
 
 import Codec.Picture (Image,Pixel8)
@@ -36,7 +36,7 @@ data LineQuery =
 
 data ImageQueryResult = ImageQueryResult {
     tableRows :: [Vector Double],
-    lineValues :: [Vector (Vector Pixel8)],
+    lineImages :: Vector (Image Pixel8),
     averageImage :: Maybe (Image Pixel8)}
 
 runImageQuery :: ImageQuery -> Fold (Image Pixel8) ImageQueryResult
@@ -58,8 +58,8 @@ runTableQueries :: Vector TableQuery -> Image Pixel8 -> Vector Double
 runTableQueries tablequeries image = Vector.map (flip runTableQuery image) tablequeries
 
 
-lineFold :: Vector LineQuery -> Fold (Image Pixel8) [Vector (Vector Pixel8)]
-lineFold linequeries = Fold.premap (runLineQueries linequeries) Fold.list
+lineFold :: Vector LineQuery -> Fold (Image Pixel8) (Vector (Image Pixel8))
+lineFold linequeries = fmap toLineImages (Fold.premap (runLineQueries linequeries) Fold.list)
 
 runLineQuery :: LineQuery -> Image Pixel8 -> Vector Pixel8
 runLineQuery (HorizontalLine fromx fromy tox) image = horizontalLine fromx fromy tox image

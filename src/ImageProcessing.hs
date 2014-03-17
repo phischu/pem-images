@@ -5,22 +5,34 @@ import Codec.Picture (
     Image,Pixel,Pixel8,
     imageWidth,imageHeight,pixelAt,
     pixelMap,generateImage)
-import Codec.Picture.Types (Pixel32)
+import Codec.Picture.Types (
+    Pixel32,
+    createMutableImage,writePixel,freezeImage)
 
-import Data.List (foldl')
-import Data.Set (Set)
-import qualified Data.Set as Set (union,singleton)
-import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith,delete)
-import Data.Array (Array,assocs)
-import Data.Array.ST (STArray,runSTArray,newArray,newArray_,readArray,writeArray)
-import Control.Monad.ST (ST)
-import Data.STRef.Strict (newSTRef,readSTRef,writeSTRef)
-import qualified Data.UnionFind.ST as UnionFind (Point,fresh,equivalent,union,descriptor)
+import Data.List (
+    foldl')
+import Data.Set (
+    Set)
+import qualified Data.Set as Set (
+    union,singleton)
+import qualified Data.IntMap.Strict as IntMap (
+    empty,elems,insertWith,delete)
+import Data.Array (
+    Array,assocs)
+import Data.Array.ST (
+    STArray,runSTArray,newArray,newArray_,readArray,writeArray)
+import Control.Monad.ST (
+    ST,runST)
+import Data.STRef.Strict (
+    newSTRef,readSTRef,writeSTRef,modifySTRef)
+import qualified Data.UnionFind.ST as UnionFind (
+    Point,fresh,equivalent,union,descriptor)
 
-import Control.Monad (forM,when)
+import Control.Monad (when)
+import Data.Traversable (forM)
 
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (map,enumFromStepN)
+import qualified Data.Vector as Vector (map,enumFromStepN,length)
 
 valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
 valueInPoint x y image
@@ -43,6 +55,27 @@ verticalLine fromx fromy toy image =
         (Vector.enumFromStepN fromy step n) where
             step = signum (toy - fromy)
             n = abs (toy - fromy + 1)
+
+toLineImages :: [Vector (Vector Pixel8)] -> Vector (Image Pixel8)
+toLineImages = Vector.map accumulateImage . sequence
+
+accumulateImage :: [Vector Pixel8] -> Image Pixel8
+accumulateImage imagelines = runST (do
+    let width = length imagelines
+        height = case imagelines of
+            [] -> 0
+            (imageline:_) -> Vector.length imageline
+    image <- createMutableImage width height 0
+    xref <- newSTRef 0
+    forM imagelines (\imageline -> do
+        yref <- newSTRef 0
+        forM imageline (\pixelvalue -> do
+            x <- readSTRef xref
+            y <- readSTRef yref
+            writePixel image x y pixelvalue
+            modifySTRef yref (+1))
+        modifySTRef xref (+1))
+    freezeImage image)
 
 addImage :: Maybe (Image Pixel32) -> Image Pixel8 -> Maybe (Image Pixel32)
 addImage Nothing image = Just (pixelMap fromIntegral image)
