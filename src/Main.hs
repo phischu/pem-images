@@ -3,7 +3,8 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQuery(ImageQuery),
-    TableQuery(NumberOfIslands),LineQuery(HorizontalLine),
+    TableQuery(NumberOfIslands,ValueInPoint,AverageAroundPoint),
+    LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
 
 import Codec.Picture (writeBitmap)
@@ -16,6 +17,7 @@ import qualified Pipes.Prelude as Pipes
 import Data.Traversable (forM)
 
 import Control.Error (EitherT,runEitherT)
+import Data.Vector (Vector)
 import Data.Vector as V (fromList,indexed)
 import qualified Data.ByteString.Lazy as ByteString (writeFile)
 
@@ -24,8 +26,14 @@ import qualified Data.Csv as Csv (encode)
 testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
 
+testtablequeries :: Vector TableQuery
+testtablequeries = V.fromList [
+    NumberOfIslands,
+    AverageAroundPoint 2 126 12,
+    ValueInPoint 2 126]
+
 testquery :: ImageQuery
-testquery = ImageQuery (V.fromList [NumberOfIslands]) (V.fromList [HorizontalLine (-3) 14 12]) True
+testquery = ImageQuery testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
 main = do

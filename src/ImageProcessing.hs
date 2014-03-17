@@ -35,6 +35,13 @@ valueInPoint x y image
     | x < 0 || x >= imageWidth image || y < 0 || y > imageHeight image = 0
     | otherwise = fromIntegral (pixelAt image x y)
 
+averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
+averageAroundPoint x y r image = sum pixelvalues / fromIntegral (length pixelvalues) where
+    pixelvalues = do
+        dx <- [-r .. r]
+        dy <- [-r .. r]
+        return (valueInPoint (x+dx) (y+dy) image)
+
 numberOfIslands :: Image Pixel8 -> Double
 numberOfIslands image = fromIntegral (length (connectedComponents image))
 
