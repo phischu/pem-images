@@ -1,12 +1,7 @@
 module Main where
 
 import ImageLoading (loadImage)
-import ImageProcessing (numberOfIslands,fromBoxedImage,toBoxedImage)
-
-import Data.Image.Binary (toBinaryImage)
-import Data.Image.Boxed (label)
-
-import Codec.Picture (writeBitmap)
+import ImageProcessing (numberOfIslands)
 
 import Control.Error (runEitherT)
 

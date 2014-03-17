@@ -12,8 +12,12 @@ import Pipes ((>->))
 import Control.Foldl (purely)
 import Pipes.Prelude (fold)
 import qualified Pipes.Prelude as Pipes
-import Data.Vector as V (fromList)
+
 import Control.Error (EitherT,runEitherT)
+import Data.Vector as V (fromList)
+import qualified Data.ByteString.Lazy as ByteString (writeFile)
+
+import qualified Data.Csv as Csv (encode)
 
 testdirectory :: FilePath
 testdirectory = "data/2008-05/PEEM08050800/"
@@ -24,10 +28,10 @@ testquery = ImageQuery (V.fromList [NumberOfIslands]) (V.fromList [HorizontalLin
 main :: IO ()
 main = do
     result <- runEitherT (purely fold (runImageQuery testquery)
-        (imageSeries testdirectory >-> Pipes.take 1))
+        (imageSeries testdirectory >-> Pipes.take 10))
     case result of
         Left err -> print err
         Right imagequeryresult -> do
-            print (tableRows imagequeryresult)
+            ByteString.writeFile "result.txt" (Csv.encode (tableRows imagequeryresult))
             print (lineValues imagequeryresult)
             maybe (putStrLn "no average image") (writeBitmap "average_image.bmp") (averageImage imagequeryresult)

@@ -7,11 +7,6 @@ import Codec.Picture (
     pixelMap,generateImage)
 import Codec.Picture.Types (Pixel32)
 
-import Data.Image (GrayImage,makeImage)
-import Data.Image.Binary (toBinaryImage)
-import Data.Image.Internal (maxIntensity,minIntensity,cols,rows,ref)
-import Data.Image.Boxed (label)
-
 import Data.List (foldl')
 import Data.Set (Set)
 import qualified Data.Set as Set (union,singleton)
@@ -19,7 +14,7 @@ import qualified Data.IntMap.Strict as IntMap (empty,elems,insertWith,delete)
 import Data.Array (Array,assocs)
 import Data.Array.ST (STArray,runSTArray,newArray,newArray_,readArray,writeArray)
 import Control.Monad.ST (ST)
-import Data.STRef.Strict (newSTRef,modifySTRef,readSTRef,writeSTRef)
+import Data.STRef.Strict (newSTRef,readSTRef,writeSTRef)
 import qualified Data.UnionFind.ST as UnionFind (Point,fresh,equivalent,union,descriptor)
 
 import Control.Monad (forM,when)
@@ -106,13 +101,3 @@ accumulateComponents labelarray = IntMap.elems (IntMap.delete 0 (foldl' insertPo
     insertPosition accumulator (position,label) =
         IntMap.insertWith Set.union label (Set.singleton position) accumulator
 
-toBoxedImage :: Image Pixel8 -> GrayImage
-toBoxedImage image = makeImage (imageHeight image) (imageWidth image) (\r c -> fromIntegral (pixelAt image c r))
-
-fromBoxedImage :: GrayImage -> Image Pixel8
-fromBoxedImage image = generateImage generatingFunction width height where
-    width = cols image
-    height = rows image
-    generatingFunction x y = floor ((ref image y x - minintensity) / intensityrange * 255.0)
-    minintensity = minIntensity image
-    intensityrange = maxIntensity image - minintensity
