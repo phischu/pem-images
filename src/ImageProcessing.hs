@@ -11,12 +11,8 @@ import Codec.Picture.Types (
 
 import Data.List (
     foldl')
-import Data.Set (
-    Set)
-import qualified Data.Set as Set (
-    union,singleton)
 import qualified Data.IntMap.Strict as IntMap (
-    empty,elems,insertWith,delete)
+    empty,elems,alter,delete)
 import Data.Array (
     Array,assocs)
 import Data.Array.ST (
@@ -90,7 +86,7 @@ finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
 
-connectedComponents :: Image Pixel8 -> [Set (Int,Int)]
+connectedComponents :: Image Pixel8 -> [[(Int,Int)]]
 connectedComponents image = accumulateComponents (labelArray image)
 
 labelArray :: Image Pixel8 -> Array (Int,Int) Int
@@ -129,8 +125,8 @@ labelArray image = runSTArray (do
             writeArray labelimage (x,y) label))     
     return labelimage)
 
-accumulateComponents :: Array (Int,Int) Int -> [Set (Int,Int)]
+accumulateComponents :: Array (Int,Int) Int -> [[(Int,Int)]]
 accumulateComponents labelarray = IntMap.elems (IntMap.delete 0 (foldl' insertPosition IntMap.empty (assocs labelarray))) where
     insertPosition accumulator (position,label) =
-        IntMap.insertWith Set.union label (Set.singleton position) accumulator
+        IntMap.alter (maybe (Just [position]) (\positions -> Just (position:positions))) label accumulator
 

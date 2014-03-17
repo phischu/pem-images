@@ -30,7 +30,7 @@ testquery = ImageQuery (V.fromList [NumberOfIslands]) (V.fromList [HorizontalLin
 main :: IO ()
 main = do
     result <- runEitherT (purely fold (runImageQuery testquery)
-        (imageSeries testdirectory >-> Pipes.take 10))
+        (imageSeries testdirectory >-> Pipes.take 2))
     case result of
         Left err -> print err
         Right imagequeryresult -> do
