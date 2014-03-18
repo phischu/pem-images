@@ -7,7 +7,7 @@ import Codec.Picture (
     pixelMap,generateImage)
 import Codec.Picture.Types (
     Pixel32,
-    pixelFold,
+    pixelFold,pixelMapXY,
     createMutableImage,writePixel,freezeImage)
 
 import Data.List (
@@ -59,10 +59,10 @@ averagePerIsland image countpixels = if numberofislands == 0.0
         numberofislands = numberOfIslands image
 
 averageAreaOfIslands :: Image Pixel8 -> Double
-averageAreaOfIslands image = averagePerIsland image numberOfAreaPixels
+averageAreaOfIslands image = averagePerIsland image numberOfNonZeroPixels
 
-numberOfAreaPixels :: Image Pixel8 -> Double
-numberOfAreaPixels image = pixelFold countAreaPixel 0 image where
+numberOfNonZeroPixels :: Image Pixel8 -> Double
+numberOfNonZeroPixels image = pixelFold countAreaPixel 0 image where
     countAreaPixel n _ _ pixelvalue
         | pixelvalue /= 0 = n + 1
         | otherwise = n
@@ -71,17 +71,10 @@ averageOutlineOfIslands :: Image Pixel8 -> Double
 averageOutlineOfIslands image = averagePerIsland image numberOfOutlinePixels
 
 numberOfOutlinePixels :: Image Pixel8 -> Double
-numberOfOutlinePixels image = pixelFold countOutlinePixel 0 image where
-    countOutlinePixel n x y pixelvalue
-        | pixelvalue /= 0 && neighbourIsZero x y image = n + 1
-        | otherwise = n
-
-neighbourIsZero :: Int -> Int -> Image Pixel8 -> Bool
-neighbourIsZero x y image = or (do
-    dx <- [-1,1]
-    dy <- [-1,1]
-    let zero = 0 :: Pixel8
-    return (valueInPoint (x+dx) (y+dy) image == zero))
+numberOfOutlinePixels image = numberOfNonZeroPixels (pixelMapXY isOutline image) where
+    isOutline x y pixelvalue = if all (/=0) [valueInPoint x' y' image :: Pixel8 | (x',y') <- [(x-1,y),(x+1,y),(x,y-1),(x,y+1)]]
+        then 0
+        else pixelvalue
 
 horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
 horizontalLine fromx fromy tox image =
