@@ -2,7 +2,7 @@ module ImageQuery where
 
 import ImageProcessing (
     valueInPoint,averageAroundPoint,averageOfImage,
-    numberOfIslands,
+    numberOfIslands,averageAreaOfIslands,
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage,)
 
@@ -25,7 +25,8 @@ data TableQuery =
     ValueInPoint Int Int |
     AverageAroundPoint Int Int Int |
     AverageOfImage |
-    NumberOfIslands deriving Show
+    NumberOfIslands |
+    AverageAreaOfIslands deriving Show
 
 data LineQuery =
     HorizontalLine {
@@ -58,6 +59,7 @@ runTableQuery (ValueInPoint x y) image = valueInPoint x y image
 runTableQuery (AverageAroundPoint x y r) image = averageAroundPoint x y r image
 runTableQuery AverageOfImage image = averageOfImage image
 runTableQuery NumberOfIslands image = numberOfIslands image
+runTableQuery AverageAreaOfIslands  image = averageAreaOfIslands image
 
 runTableQueries :: Vector TableQuery -> Image Pixel8 -> Vector Double
 runTableQueries tablequeries image = Vector.map (flip runTableQuery image) tablequeries

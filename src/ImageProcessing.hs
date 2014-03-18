@@ -52,6 +52,14 @@ averageOfImage image = sumOfPixels / numberOfPixels where
 numberOfIslands :: Image Pixel8 -> Double
 numberOfIslands image = fromIntegral (length (connectedComponents image))
 
+averageAreaOfIslands :: Image Pixel8 -> Double
+averageAreaOfIslands image = if numberofislands == 0.0 then 0.0 else numberofislandpixels / numberofislands where
+    numberofislands = numberOfIslands image
+    numberofislandpixels = pixelFold countpixel 0 image
+    countpixel accumulator _ _ pixelvalue
+        | pixelvalue == 0 = accumulator
+        | otherwise = accumulator + 1
+
 horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
 horizontalLine fromx fromy tox image =
     Vector.map (\x -> valueInPoint x fromy image)
