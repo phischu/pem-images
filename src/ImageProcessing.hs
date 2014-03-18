@@ -33,7 +33,7 @@ import qualified Data.Vector as Vector (map,enumFromStepN,length)
 
 valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
 valueInPoint x y image
-    | x < 0 || x >= imageWidth image || y < 0 || y > imageHeight image = 0
+    | x < 0 || x >= imageWidth image || y < 0 || y >= imageHeight image = 0
     | otherwise = fromIntegral (pixelAt image x y)
 
 averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
@@ -52,13 +52,36 @@ averageOfImage image = sumOfPixels / numberOfPixels where
 numberOfIslands :: Image Pixel8 -> Double
 numberOfIslands image = fromIntegral (length (connectedComponents image))
 
+averagePerIsland :: Image Pixel8 -> (Image Pixel8 -> Double) -> Double
+averagePerIsland image countpixels = if numberofislands == 0.0
+    then 0.0
+    else countpixels image / numberofislands where
+        numberofislands = numberOfIslands image
+
 averageAreaOfIslands :: Image Pixel8 -> Double
-averageAreaOfIslands image = if numberofislands == 0.0 then 0.0 else numberofislandpixels / numberofislands where
-    numberofislands = numberOfIslands image
-    numberofislandpixels = pixelFold countpixel 0 image
-    countpixel accumulator _ _ pixelvalue
-        | pixelvalue == 0 = accumulator
-        | otherwise = accumulator + 1
+averageAreaOfIslands image = averagePerIsland image numberOfAreaPixels
+
+numberOfAreaPixels :: Image Pixel8 -> Double
+numberOfAreaPixels image = pixelFold countAreaPixel 0 image where
+    countAreaPixel n _ _ pixelvalue
+        | pixelvalue /= 0 = n + 1
+        | otherwise = n
+
+averageOutlineOfIslands :: Image Pixel8 -> Double
+averageOutlineOfIslands image = averagePerIsland image numberOfOutlinePixels
+
+numberOfOutlinePixels :: Image Pixel8 -> Double
+numberOfOutlinePixels image = pixelFold countOutlinePixel 0 image where
+    countOutlinePixel n x y pixelvalue
+        | pixelvalue /= 0 && neighbourIsZero x y image = n + 1
+        | otherwise = n
+
+neighbourIsZero :: Int -> Int -> Image Pixel8 -> Bool
+neighbourIsZero x y image = or (do
+    dx <- [-1,1]
+    dy <- [-1,1]
+    let zero = 0 :: Pixel8
+    return (valueInPoint (x+dx) (y+dy) image == zero))
 
 horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
 horizontalLine fromx fromy tox image =

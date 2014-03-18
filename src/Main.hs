@@ -3,7 +3,9 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQuery(ImageQuery),
-    TableQuery(NumberOfIslands,ValueInPoint,AverageAroundPoint,AverageOfImage,AverageAreaOfIslands),
+    TableQuery(
+        NumberOfIslands,ValueInPoint,AverageAroundPoint,
+        AverageOfImage,AverageAreaOfIslands,AverageOutlineOfIslands),
     LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
 
@@ -32,7 +34,8 @@ testtablequeries = V.fromList [
     AverageAroundPoint 2 126 12,
     ValueInPoint 2 126,
     AverageOfImage,
-    AverageAreaOfIslands]
+    AverageAreaOfIslands,
+    AverageOutlineOfIslands]
 
 testquery :: ImageQuery
 testquery = ImageQuery testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
