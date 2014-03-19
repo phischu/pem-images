@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances,TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances,TypeFamilies,BangPatterns #-}
 module ImageProcessing where
 
 import Codec.Picture (
@@ -40,11 +40,8 @@ valueInPoint x y image
     | otherwise = fromIntegral (pixelAt image x y)
 
 averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> AreaRadius -> Image a -> b
-averageAroundPoint x y r image = sum pixelvalues / fromIntegral (length pixelvalues) where
-    pixelvalues = do
-        dx <- [-r .. r]
-        dy <- [-r .. r]
-        return (valueInPoint (x+dx) (y+dy) image)
+averageAroundPoint x y r image = sum pixelvalues / ((2 * fromIntegral r + 1)^(2::Int)) where
+    pixelvalues = [valueInPoint (x+dx) (y+dy) image | dx <- [-r..r], dy <- [-r..r]]
 
 averageOfImage :: (Pixel a,Integral a,Num b,Fractional b) => Image a -> b
 averageOfImage image = sumOfPixels / numberOfPixels where
@@ -53,7 +50,13 @@ averageOfImage image = sumOfPixels / numberOfPixels where
     numberOfPixels = fromIntegral (imageWidth image * imageHeight image)
 
 numberOfIslands :: Threshold -> AreaRadius -> Image Pixel8 -> Double
-numberOfIslands _ _ image = fromIntegral (length (connectedComponents image))
+numberOfIslands threshold blurradius image = fromIntegral (length (connectedComponents (binarize threshold (blur blurradius image))))
+
+blur :: AreaRadius -> Image Pixel8 -> Image Pixel8
+blur blurradius image = generateImage (\x y -> floor (averageAroundPoint x y blurradius image :: Double)) (imageWidth image) (imageHeight image)
+
+binarize :: Threshold -> Image Pixel8 -> Image Pixel8
+binarize threshold image = pixelMap (\pixelvalue -> if pixelvalue < threshold then 0 else 255) image
 
 numberOfNonZeroPixels :: Image Pixel8 -> Double
 numberOfNonZeroPixels image = pixelFold countAreaPixel 0 image where
