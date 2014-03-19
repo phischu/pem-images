@@ -8,4 +8,4 @@ import Control.Error (runEitherT)
 main :: IO ()
 main = do
     Right image <- runEitherT (loadImage "tests/ConnectedComponents.bmp")
-    print (numberOfIslands image)
+    print (numberOfIslands 20 0 image)

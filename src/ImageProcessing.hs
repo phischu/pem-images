@@ -31,12 +31,15 @@ import Data.Traversable (forM)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN,length)
 
+type Threshold = Pixel8
+type AreaRadius = Int
+
 valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
 valueInPoint x y image
     | x < 0 || x >= imageWidth image || y < 0 || y >= imageHeight image = 0
     | otherwise = fromIntegral (pixelAt image x y)
 
-averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
+averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> AreaRadius -> Image a -> b
 averageAroundPoint x y r image = sum pixelvalues / fromIntegral (length pixelvalues) where
     pixelvalues = do
         dx <- [-r .. r]
@@ -49,26 +52,14 @@ averageOfImage image = sumOfPixels / numberOfPixels where
     addPixel accumulator _ _ pixelvalue = accumulator + fromIntegral pixelvalue
     numberOfPixels = fromIntegral (imageWidth image * imageHeight image)
 
-numberOfIslands :: Image Pixel8 -> Double
-numberOfIslands image = fromIntegral (length (connectedComponents image))
-
-averagePerIsland :: Image Pixel8 -> (Image Pixel8 -> Double) -> Double
-averagePerIsland image countpixels = if numberofislands == 0.0
-    then 0.0
-    else countpixels image / numberofislands where
-        numberofislands = numberOfIslands image
-
-averageAreaOfIslands :: Image Pixel8 -> Double
-averageAreaOfIslands image = averagePerIsland image numberOfNonZeroPixels
+numberOfIslands :: Threshold -> AreaRadius -> Image Pixel8 -> Double
+numberOfIslands _ _ image = fromIntegral (length (connectedComponents image))
 
 numberOfNonZeroPixels :: Image Pixel8 -> Double
 numberOfNonZeroPixels image = pixelFold countAreaPixel 0 image where
     countAreaPixel n _ _ pixelvalue
         | pixelvalue /= 0 = n + 1
         | otherwise = n
-
-averageOutlineOfIslands :: Image Pixel8 -> Double
-averageOutlineOfIslands image = averagePerIsland image numberOfOutlinePixels
 
 numberOfOutlinePixels :: Image Pixel8 -> Double
 numberOfOutlinePixels image = numberOfNonZeroPixels (pixelMapXY isOutline image) where

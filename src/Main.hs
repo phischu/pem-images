@@ -38,7 +38,7 @@ testtablequeries = V.fromList [
     AverageOutlineOfIslands]
 
 testquery :: ImageQuery
-testquery = ImageQuery testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
+testquery = ImageQuery 20 1 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
 main = do
