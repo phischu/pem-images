@@ -8,6 +8,7 @@ import ImageQuery (
         AverageOfImage,AverageAreaOfIslands,AverageOutlineOfIslands),
     LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
+import ImageProcessing (imageToJuicy)
 
 import Codec.Picture (writeBitmap)
 
@@ -49,5 +50,5 @@ main = do
         Right imagequeryresult -> do
             ByteString.writeFile "result.txt" (Csv.encode (tableRows imagequeryresult))
             forM (V.indexed (lineImages imagequeryresult)) (\(i,image) -> do
-                writeBitmap ("lineimage" ++ show i ++ ".bmp") image)
-            maybe (putStrLn "no average image") (writeBitmap "average_image.bmp") (averageImage imagequeryresult)
+                writeBitmap ("lineimage" ++ show i ++ ".bmp") (imageToJuicy image))
+            maybe (putStrLn "no average image") (writeBitmap "average_image.bmp" . imageToJuicy) (averageImage imagequeryresult)

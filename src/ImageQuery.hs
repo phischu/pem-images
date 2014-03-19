@@ -1,14 +1,13 @@
 module ImageQuery where
 
 import ImageProcessing (
-    Threshold,
+    Image,Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
-    numberOfIslands,numberOfNonZeroPixels,numberOfOutlinePixels,
+    binarize,numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
-    addImage,finalizeAverageImage,)
+    addImage,finalizeAverageImage)
 
-import Codec.Picture (Image,Pixel8)
-import Codec.Picture.Types (Pixel32)
+import Data.Word (Word8)
 
 import Control.Foldl (Fold(Fold))
 import qualified Control.Foldl as Fold (list,premap,length)
@@ -18,7 +17,7 @@ import Data.Vector (Vector)
 import Data.Vector as Vector (map)
 
 data ImageQuery = ImageQuery {
-    binarizationThreshold :: Pixel8,
+    binarizationThreshold :: Word8,
     tableQueries :: Vector TableQuery,
     lineQueries :: Vector LineQuery,
     averageImageQuery :: Bool} deriving Show
@@ -43,10 +42,10 @@ data LineQuery =
 
 data ImageQueryResult = ImageQueryResult {
     tableRows :: [Vector Double],
-    lineImages :: Vector (Image Pixel8),
-    averageImage :: Maybe (Image Pixel8)}
+    lineImages :: Vector (Image Word8),
+    averageImage :: Maybe (Image Word8)}
 
-runImageQuery :: ImageQuery -> Fold (Image Pixel8) ImageQueryResult
+runImageQuery :: ImageQuery -> Fold (Image Word8) ImageQueryResult
 runImageQuery imagequery =
     ImageQueryResult <$>
     tableFold (binarizationThreshold imagequery) (tableQueries imagequery) <*>
@@ -54,36 +53,37 @@ runImageQuery imagequery =
     averageImageFold (averageImageQuery imagequery)
 
 
-tableFold :: Threshold ->  Vector TableQuery -> Fold (Image Pixel8) [Vector Double]
+tableFold :: Threshold ->  Vector TableQuery -> Fold (Image Word8) [Vector Double]
 tableFold threshold tablequeries = Fold.premap (runTableQueries threshold tablequeries) Fold.list
 
-runTableQuery :: Double -> TableQuery -> Image Pixel8 -> Double
-runTableQuery _ (ValueInPoint x y) image = valueInPoint x y image
-runTableQuery _ (AverageAroundPoint x y r) image = averageAroundPoint x y r image
-runTableQuery _ AverageOfImage image = averageOfImage image
-runTableQuery numberofislands NumberOfIslands _ = numberofislands
-runTableQuery numberofislands AverageAreaOfIslands  image = numberOfNonZeroPixels image / numberofislands
-runTableQuery numberofislands AverageOutlineOfIslands image = numberOfOutlinePixels image / numberofislands
+runTableQuery :: Image Bool -> Double -> Image Word8 -> TableQuery ->  Double
+runTableQuery _ _ image (ValueInPoint x y) = fromIntegral (valueInPoint x y image)
+runTableQuery _ _ image (AverageAroundPoint x y r) = averageAroundPoint x y r image
+runTableQuery _ _ image AverageOfImage = averageOfImage image
+runTableQuery _ numberofislands _ NumberOfIslands = numberofislands
+runTableQuery binaryimage numberofislands _ AverageAreaOfIslands = numberOfTruePixels binaryimage / numberofislands
+runTableQuery binaryimage numberofislands _ AverageOutlineOfIslands = numberOfOutlinePixels binaryimage / numberofislands
 
-runTableQueries :: Threshold -> Vector TableQuery -> Image Pixel8 -> Vector Double
-runTableQueries threshold tablequeries image = Vector.map (flip (runTableQuery numberofislands) image) tablequeries where
-    numberofislands = numberOfIslands threshold image
+runTableQueries :: Threshold -> Vector TableQuery -> Image Word8 -> Vector Double
+runTableQueries threshold tablequeries image = Vector.map (runTableQuery binaryimage numberofislands image) tablequeries where
+    binaryimage = binarize threshold image
+    numberofislands = fromIntegral (numberOfIslands binaryimage)
 
 
-lineFold :: Vector LineQuery -> Fold (Image Pixel8) (Vector (Image Pixel8))
+lineFold :: Vector LineQuery -> Fold (Image Word8) (Vector (Image Word8))
 lineFold linequeries = fmap toLineImages (Fold.premap (runLineQueries linequeries) Fold.list)
 
-runLineQuery :: LineQuery -> Image Pixel8 -> Vector Pixel8
+runLineQuery :: LineQuery -> Image Word8 -> Vector Word8
 runLineQuery (HorizontalLine fromx fromy tox) image = horizontalLine fromx fromy tox image
 runLineQuery (VerticalLine fromx fromy toy) image = verticalLine fromx fromy toy image
 
-runLineQueries :: Vector LineQuery -> Image Pixel8 -> Vector (Vector Pixel8)
+runLineQueries :: Vector LineQuery -> Image Word8 -> Vector (Vector Word8)
 runLineQueries linequeries image = Vector.map (flip runLineQuery image) linequeries
 
 
-averageImageFold :: Bool -> Fold (Image Pixel8) (Maybe (Image Pixel8))
+averageImageFold :: Bool -> Fold (Image Word8) (Maybe (Image Word8))
 averageImageFold False = Fold const () (const Nothing)
 averageImageFold True = finalizeAverageImage <$> sumImageFold <*> Fold.length
 
-sumImageFold :: Fold (Image Pixel8) (Maybe (Image Pixel32))
+sumImageFold :: Fold (Image Word8) (Maybe (Image Integer))
 sumImageFold = Fold addImage Nothing id

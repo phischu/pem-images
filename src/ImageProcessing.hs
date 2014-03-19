@@ -1,14 +1,18 @@
 {-# LANGUAGE FlexibleInstances,TypeFamilies,BangPatterns #-}
 module ImageProcessing where
 
-import Codec.Picture (
-    Image,Pixel,Pixel8,
-    imageWidth,imageHeight,pixelAt,
-    pixelMap,generateImage)
-import Codec.Picture.Types (
-    Pixel32,
-    pixelFold,pixelMapXY,
-    createMutableImage,writePixel,freezeImage)
+import qualified Data.Array.Repa as Repa (
+    Array,
+    sumAllS,map,traverse,delay)
+import Data.Array.Repa (
+    Array,D,DIM2,extent,
+    inShape,(:.)((:.)),Z(Z),index,
+    (+^),Shape)
+import qualified Data.Array.Repa.Repr.Vector as Repa (fromVector)
+
+import qualified Codec.Picture as Juicy (Image,Pixel8)
+
+import Data.Word (Word8)
 
 import Data.List (
     foldl')
@@ -29,96 +33,91 @@ import Control.Monad (when)
 import Data.Traversable (forM)
 
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (map,enumFromStepN,length)
+import qualified Data.Vector as Vector (map,enumFromStepN,length,concat)
 
-type Threshold = Pixel8
+type Image a = Repa.Array D DIM2 a
 
-valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
-valueInPoint x y image
-    | x < 0 || x >= imageWidth image || y < 0 || y >= imageHeight image = 0
-    | otherwise = fromIntegral (pixelAt image x y)
+juicyToImage :: Juicy.Image Juicy.Pixel8 -> Image Word8
+juicyToImage = undefined
 
-averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
-averageAroundPoint x y r image = sum pixelvalues / ((2 * fromIntegral r + 1)^(2::Int)) where
-    pixelvalues = [valueInPoint (x+dx) (y+dy) image | dx <- [-r..r], dy <- [-r..r]]
+imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
+imageToJuicy = undefined
 
-averageOfImage :: (Pixel a,Integral a,Num b,Fractional b) => Image a -> b
+type Threshold = Word8
+
+valueInPoint :: (Num a) => Int -> Int -> Image a -> a
+valueInPoint x y image = withDefault (extent image) 0 (index image) (Z:.y:.x)
+
+averageAroundPoint :: (Num a,Integral a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
+averageAroundPoint x y r image = sum pixelvalues / (2 * fromIntegral r + 1)^2 where
+    pixelvalues = do
+        dx <- [-r..r]
+        dy <- [-r..r]
+        return (fromIntegral (valueInPoint (x+dx) (y+dy) image))
+
+averageOfImage :: (Integral a) => Image a -> Double
 averageOfImage image = sumOfPixels / numberOfPixels where
-    sumOfPixels = pixelFold addPixel 0 image where
-    addPixel accumulator _ _ pixelvalue = accumulator + fromIntegral pixelvalue
-    numberOfPixels = fromIntegral (imageWidth image * imageHeight image)
+    sumOfPixels = Repa.sumAllS (Repa.map fromIntegral image :: Image Double)
+    numberOfPixels = fromIntegral (w * h)
+    Z:.h:.w = extent image
 
-numberOfIslands :: Threshold -> Image Pixel8 -> Double
-numberOfIslands threshold image = fromIntegral (length (connectedComponents (binarize threshold image)))
+numberOfIslands :: Image Bool -> Int
+numberOfIslands image = numberOfLabels (labelImage image)
 
-binarize :: Threshold -> Image Pixel8 -> Image Pixel8
-binarize threshold image = pixelMap (\pixelvalue -> if pixelvalue < threshold then 0 else 255) image
+binarize :: Threshold -> Image Word8 -> Image Bool
+binarize threshold image = Repa.map (\pixelvalue -> pixelvalue > threshold) image
 
-numberOfNonZeroPixels :: Image Pixel8 -> Double
-numberOfNonZeroPixels image = pixelFold countAreaPixel 0 image where
-    countAreaPixel n _ _ pixelvalue
-        | pixelvalue /= 0 = n + 1
-        | otherwise = n
+numberOfTruePixels :: Image Bool -> Double
+numberOfTruePixels image = Repa.sumAllS (Repa.map boolToDouble image) where
+    boolToDouble False = 0.0
+    boolToDouble True = 1.0
 
-numberOfOutlinePixels :: Image Pixel8 -> Double
-numberOfOutlinePixels image = numberOfNonZeroPixels (pixelMapXY isOutline image) where
-    isOutline x y pixelvalue = if all (/=0) [valueInPoint x' y' image :: Pixel8 | (x',y') <- [(x-1,y),(x+1,y),(x,y-1),(x,y+1)]]
-        then 0
-        else pixelvalue
+numberOfOutlinePixels :: Image Bool -> Double
+numberOfOutlinePixels image = numberOfTruePixels (Repa.traverse image id isOutline) where
+    isOutline i (Z:.y:.x) = not (all (withDefault (extent image) False i) indices) where
+        indices = [Z:.y:.x-1,Z:.y:.x+1,Z:.y-1:.x,Z:.y+1:.x]
 
-horizontalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
+withDefault :: (Shape sh) => sh -> a -> (sh -> a) -> sh -> a
+withDefault shape def image position
+    | inShape shape position = image position
+    | otherwise = def
+
+horizontalLine :: (Num a) => Int -> Int -> Int -> Image a -> Vector a
 horizontalLine fromx fromy tox image =
     Vector.map (\x -> valueInPoint x fromy image)
         (Vector.enumFromStepN fromx step n) where
             step = signum (tox - fromx)
             n = abs (tox - fromx + 1)
 
-verticalLine :: (Integral a,Pixel a,Num b) => Int -> Int -> Int -> Image a -> Vector b
+verticalLine :: (Num a) => Int -> Int -> Int -> Image a -> Vector a
 verticalLine fromx fromy toy image =
     Vector.map (\y -> valueInPoint fromx y image)
         (Vector.enumFromStepN fromy step n) where
             step = signum (toy - fromy)
             n = abs (toy - fromy + 1)
 
-toLineImages :: [Vector (Vector Pixel8)] -> Vector (Image Pixel8)
+toLineImages :: [Vector (Vector Word8)] -> Vector (Image Word8)
 toLineImages = Vector.map accumulateImage . sequence
 
-accumulateImage :: [Vector Pixel8] -> Image Pixel8
-accumulateImage imagelines = runST (do
-    let width = length imagelines
-        height = case imagelines of
-            [] -> 0
-            (imageline:_) -> Vector.length imageline
-    image <- createMutableImage width height 0
-    xref <- newSTRef 0
-    forM imagelines (\imageline -> do
-        yref <- newSTRef 0
-        forM imageline (\pixelvalue -> do
-            x <- readSTRef xref
-            y <- readSTRef yref
-            writePixel image x y pixelvalue
-            modifySTRef yref (+1))
-        modifySTRef xref (+1))
-    freezeImage image)
+accumulateImage :: [Vector Word8] -> Image Word8
+accumulateImage imagelines = Repa.delay (Repa.fromVector (Z:.h:.w) (Vector.concat imagelines)) where
+    w = length imagelines
+    h = case imagelines of
+        [] -> 0
+        (imageline:_) -> Vector.length imageline
 
-addImage :: Maybe (Image Pixel32) -> Image Pixel8 -> Maybe (Image Pixel32)
-addImage Nothing image = Just (pixelMap fromIntegral image)
-addImage (Just accuImage) image = Just (generateImage generatingFunction width height) where
-    width = imageWidth accuImage
-    height = imageHeight accuImage
-    generatingFunction x y = pixelAt accuImage x y + fromIntegral (pixelAt image x y)
+addImage :: Maybe (Image Integer) -> Image Word8 -> Maybe (Image Integer)
+addImage Nothing image = Just (Repa.map fromIntegral image)
+addImage (Just accuImage) image = Just (accuImage +^ (Repa.map fromIntegral image))
 
-finalizeAverageImage :: (Maybe (Image Pixel32)) -> Int -> Maybe (Image Pixel8)
+finalizeAverageImage :: (Maybe (Image Integer)) -> Int -> Maybe (Image Word8)
 finalizeAverageImage Nothing _ = Nothing
 finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
-    | otherwise = Just (pixelMap (\p -> fromIntegral (p `div` fromIntegral n)) image)
+    | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
-connectedComponents :: Image Pixel8 -> [[(Int,Int)]]
-connectedComponents image = accumulateComponents (labelArray image)
-
-labelArray :: Image Pixel8 -> Array (Int,Int) Int
-labelArray image = runSTArray (do
+labelImage :: Image Bool -> Image Int
+labelImage image = undefined{- runSTArray (do
     currentlabelref <- newSTRef 1
     let lastx = imageWidth image - 1
         lasty = imageHeight image - 1
@@ -151,10 +150,7 @@ labelArray image = runSTArray (do
             point <- readArray pointimage (x,y)
             label <- UnionFind.descriptor point
             writeArray labelimage (x,y) label))     
-    return labelimage)
+    return labelimage)-}
 
-accumulateComponents :: Array (Int,Int) Int -> [[(Int,Int)]]
-accumulateComponents labelarray = IntMap.elems (IntMap.delete 0 (foldl' insertPosition IntMap.empty (assocs labelarray))) where
-    insertPosition accumulator (position,label) =
-        IntMap.alter (maybe (Just [position]) (\positions -> Just (position:positions))) label accumulator
-
+numberOfLabels :: Image Int -> Int
+numberOfLabels = undefined
