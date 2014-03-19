@@ -32,14 +32,13 @@ import Data.Vector (Vector)
 import qualified Data.Vector as Vector (map,enumFromStepN,length)
 
 type Threshold = Pixel8
-type AreaRadius = Int
 
 valueInPoint :: (Integral a,Pixel a,Num b) => Int -> Int -> Image a -> b
 valueInPoint x y image
     | x < 0 || x >= imageWidth image || y < 0 || y >= imageHeight image = 0
     | otherwise = fromIntegral (pixelAt image x y)
 
-averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> AreaRadius -> Image a -> b
+averageAroundPoint :: (Integral a,Pixel a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
 averageAroundPoint x y r image = sum pixelvalues / ((2 * fromIntegral r + 1)^(2::Int)) where
     pixelvalues = [valueInPoint (x+dx) (y+dy) image | dx <- [-r..r], dy <- [-r..r]]
 
@@ -49,11 +48,8 @@ averageOfImage image = sumOfPixels / numberOfPixels where
     addPixel accumulator _ _ pixelvalue = accumulator + fromIntegral pixelvalue
     numberOfPixels = fromIntegral (imageWidth image * imageHeight image)
 
-numberOfIslands :: Threshold -> AreaRadius -> Image Pixel8 -> Double
-numberOfIslands threshold blurradius image = fromIntegral (length (connectedComponents (binarize threshold (blur blurradius image))))
-
-blur :: AreaRadius -> Image Pixel8 -> Image Pixel8
-blur blurradius image = generateImage (\x y -> floor (averageAroundPoint x y blurradius image :: Double)) (imageWidth image) (imageHeight image)
+numberOfIslands :: Threshold -> Image Pixel8 -> Double
+numberOfIslands threshold image = fromIntegral (length (connectedComponents (binarize threshold image)))
 
 binarize :: Threshold -> Image Pixel8 -> Image Pixel8
 binarize threshold image = pixelMap (\pixelvalue -> if pixelvalue < threshold then 0 else 255) image

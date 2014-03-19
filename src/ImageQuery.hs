@@ -1,7 +1,7 @@
 module ImageQuery where
 
 import ImageProcessing (
-    Threshold,AreaRadius,
+    Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
     numberOfIslands,numberOfNonZeroPixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
@@ -19,7 +19,6 @@ import Data.Vector as Vector (map)
 
 data ImageQuery = ImageQuery {
     binarizationThreshold :: Pixel8,
-    blurRadius :: Int,
     tableQueries :: Vector TableQuery,
     lineQueries :: Vector LineQuery,
     averageImageQuery :: Bool} deriving Show
@@ -50,13 +49,13 @@ data ImageQueryResult = ImageQueryResult {
 runImageQuery :: ImageQuery -> Fold (Image Pixel8) ImageQueryResult
 runImageQuery imagequery =
     ImageQueryResult <$>
-    tableFold (binarizationThreshold imagequery) (blurRadius imagequery) (tableQueries imagequery) <*>
+    tableFold (binarizationThreshold imagequery) (tableQueries imagequery) <*>
     lineFold (lineQueries imagequery) <*>
     averageImageFold (averageImageQuery imagequery)
 
 
-tableFold :: Threshold -> AreaRadius ->  Vector TableQuery -> Fold (Image Pixel8) [Vector Double]
-tableFold threshold arearadius tablequeries = Fold.premap (runTableQueries threshold arearadius tablequeries) Fold.list
+tableFold :: Threshold ->  Vector TableQuery -> Fold (Image Pixel8) [Vector Double]
+tableFold threshold tablequeries = Fold.premap (runTableQueries threshold tablequeries) Fold.list
 
 runTableQuery :: Double -> TableQuery -> Image Pixel8 -> Double
 runTableQuery _ (ValueInPoint x y) image = valueInPoint x y image
@@ -66,9 +65,9 @@ runTableQuery numberofislands NumberOfIslands _ = numberofislands
 runTableQuery numberofislands AverageAreaOfIslands  image = numberOfNonZeroPixels image / numberofislands
 runTableQuery numberofislands AverageOutlineOfIslands image = numberOfOutlinePixels image / numberofislands
 
-runTableQueries :: Threshold -> AreaRadius -> Vector TableQuery -> Image Pixel8 -> Vector Double
-runTableQueries threshold arearadius tablequeries image = Vector.map (flip (runTableQuery numberofislands) image) tablequeries where
-    numberofislands = numberOfIslands threshold arearadius image
+runTableQueries :: Threshold -> Vector TableQuery -> Image Pixel8 -> Vector Double
+runTableQueries threshold tablequeries image = Vector.map (flip (runTableQuery numberofislands) image) tablequeries where
+    numberofislands = numberOfIslands threshold image
 
 
 lineFold :: Vector LineQuery -> Fold (Image Pixel8) (Vector (Image Pixel8))
