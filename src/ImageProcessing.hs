@@ -5,21 +5,24 @@ import qualified Data.Array.Repa as Repa (
     Array,
     sumAllS,map,traverse,delay)
 import Data.Array.Repa (
-    Array,D,DIM2,extent,
+    D,DIM2,extent,
     inShape,(:.)((:.)),Z(Z),index,
     (+^),Shape)
-import qualified Data.Array.Repa.Repr.Vector as Repa (fromVector)
+import qualified Data.Array.Repa.Repr.Vector as Repa (
+    fromVector,fromListVector,toVector,computeVectorS)
+import qualified Data.Array.Repa.Repr.Delayed as Repa (
+    fromFunction)
 
-import qualified Codec.Picture as Juicy (Image,Pixel8)
+import qualified Codec.Picture as Juicy (
+    Image,Pixel8,pixelAt,imageHeight,imageWidth,generateImage)
 
 import Data.Word (Word8)
 
-import Data.List (
-    foldl')
 import qualified Data.IntMap.Strict as IntMap (
     empty,elems,alter,delete)
 import Data.Array (
-    Array,assocs)
+    Array,assocs,elems,bounds)
+import qualified Data.Set as Set (empty,insert,size)
 import Data.Array.ST (
     STArray,runSTArray,newArray,newArray_,readArray,writeArray)
 import Control.Monad.ST (
@@ -33,15 +36,19 @@ import Control.Monad (when)
 import Data.Traversable (forM)
 
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (map,enumFromStepN,length,concat)
+import qualified Data.Vector as Vector (map,enumFromStepN,length,concat,foldl')
 
 type Image a = Repa.Array D DIM2 a
 
 juicyToImage :: Juicy.Image Juicy.Pixel8 -> Image Word8
-juicyToImage = undefined
+juicyToImage juicy = Repa.fromFunction shape (\(Z:.y:.x) -> Juicy.pixelAt juicy x y) where
+    shape = Z:.h:.w
+    w = Juicy.imageWidth juicy
+    h = Juicy.imageHeight juicy
 
 imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
-imageToJuicy = undefined
+imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h where
+    Z:.h:.w = extent image
 
 type Threshold = Word8
 
@@ -117,16 +124,20 @@ finalizeAverageImage (Just image) n
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
 labelImage :: Image Bool -> Image Int
-labelImage image = undefined{- runSTArray (do
+labelImage image = arrayToImage (labelArray image)
+
+labelArray :: Image Bool -> Array (Int,Int) Int
+labelArray image = runSTArray (do
     currentlabelref <- newSTRef 1
-    let lastx = imageWidth image - 1
-        lasty = imageHeight image - 1
+    let Z:.h:.w = extent image
+        lastx = w - 1
+        lasty = h - 1
     zero <- UnionFind.fresh 0
     pointimage <- newArray_ ((0,0),(lastx,lasty)) :: ST s (STArray s (Int,Int) (UnionFind.Point s Int))
     forM [0..lasty] (\y -> do
         forM [0..lastx] (\x -> do
             writeArray pointimage (x,y) zero
-            when (pixelAt image x y /= 0) (do
+            when (index image (Z:.y:.x)) (do
                 leftpoint <- if x <= 0 then return zero else readArray pointimage (x-1,y)
                 upperpoint <- if y <= 0 then return zero else readArray pointimage (x,y-1)
                 leftiszero <- UnionFind.equivalent leftpoint zero
@@ -150,7 +161,14 @@ labelImage image = undefined{- runSTArray (do
             point <- readArray pointimage (x,y)
             label <- UnionFind.descriptor point
             writeArray labelimage (x,y) label))     
-    return labelimage)-}
+    return labelimage)
+
+arrayToImage :: Array (Int,Int) a -> Image a
+arrayToImage arr = Repa.delay (Repa.fromListVector shape (elems arr)) where
+    shape = Z:.h:.w
+    w = hx - lx + 1
+    h = hy - ly + 1
+    ((lx,ly),(hx,hy)) = bounds arr
 
 numberOfLabels :: Image Int -> Int
-numberOfLabels = undefined
+numberOfLabels image = Set.size (Vector.foldl' (flip Set.insert) Set.empty (Repa.toVector (Repa.computeVectorS image)))
