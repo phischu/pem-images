@@ -8,8 +8,8 @@ import Data.Array.Repa (
     D,DIM2,extent,
     inShape,(:.)((:.)),Z(Z),index,
     (+^),Shape)
-import qualified Data.Array.Repa.Repr.Vector as Repa (
-    fromVector,fromListVector,toVector,computeVectorS)
+import qualified Data.Array.Repa.Repr.Unboxed as Repa (
+    fromUnboxed,computeUnboxedS)
 import qualified Data.Array.Repa.Repr.Delayed as Repa (
     fromFunction)
 
@@ -18,30 +18,30 @@ import qualified Codec.Picture as Juicy (
 
 import Data.Word (Word8)
 
-import qualified Data.IntMap.Strict as IntMap (
-    empty,elems,alter,delete)
 import Data.Array (
-    Array,assocs,elems,bounds)
+    Array,indices,(!))
 import qualified Data.Set as Set (empty,insert,size)
 import Data.Array.ST (
     STArray,runSTArray,newArray,newArray_,readArray,writeArray)
 import Control.Monad.ST (
-    ST,runST)
+    ST)
 import Data.STRef.Strict (
-    newSTRef,readSTRef,writeSTRef,modifySTRef)
+    newSTRef,readSTRef,writeSTRef)
 import qualified Data.UnionFind.ST as UnionFind (
     Point,fresh,equivalent,union,descriptor)
 
 import Control.Monad (when)
 import Data.Traversable (forM)
+import Data.List (transpose)
 
-import Data.Vector (Vector)
-import qualified Data.Vector as Vector (map,enumFromStepN,length,concat,foldl')
+import Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length,concat)
+import qualified Data.Vector as Boxed (Vector,toList,fromList)
 
 type Image a = Repa.Array D DIM2 a
 
 juicyToImage :: Juicy.Image Juicy.Pixel8 -> Image Word8
-juicyToImage juicy = Repa.fromFunction shape (\(Z:.y:.x) -> Juicy.pixelAt juicy x y) where
+juicyToImage juicy = Repa.delay (Repa.computeUnboxedS (Repa.fromFunction shape (\(Z:.y:.x) -> Juicy.pixelAt juicy x y))) where
     shape = Z:.h:.w
     w = Juicy.imageWidth juicy
     h = Juicy.imageHeight juicy
@@ -56,11 +56,12 @@ valueInPoint :: (Num a) => Int -> Int -> Image a -> a
 valueInPoint x y image = withDefault (extent image) 0 (index image) (Z:.y:.x)
 
 averageAroundPoint :: (Num a,Integral a,Num b,Fractional b) => Int -> Int -> Int -> Image a -> b
-averageAroundPoint x y r image = sum pixelvalues / (2 * fromIntegral r + 1)^2 where
+averageAroundPoint x y r image = sum pixelvalues / (2 * fromIntegral r + 1)^two where
     pixelvalues = do
         dx <- [-r..r]
         dy <- [-r..r]
         return (fromIntegral (valueInPoint (x+dx) (y+dy) image))
+    two = 2 :: Int
 
 averageOfImage :: (Integral a) => Image a -> Double
 averageOfImage image = sumOfPixels / numberOfPixels where
@@ -69,10 +70,10 @@ averageOfImage image = sumOfPixels / numberOfPixels where
     Z:.h:.w = extent image
 
 numberOfIslands :: Image Bool -> Int
-numberOfIslands image = numberOfLabels (labelImage image)
+numberOfIslands image = numberOfLabels (labelArray image)
 
 binarize :: Threshold -> Image Word8 -> Image Bool
-binarize threshold image = Repa.map (\pixelvalue -> pixelvalue > threshold) image
+binarize threshold image = Repa.delay (Repa.computeUnboxedS (Repa.map (\pixelvalue -> pixelvalue > threshold) image))
 
 numberOfTruePixels :: Image Bool -> Double
 numberOfTruePixels image = Repa.sumAllS (Repa.map boolToDouble image) where
@@ -81,33 +82,33 @@ numberOfTruePixels image = Repa.sumAllS (Repa.map boolToDouble image) where
 
 numberOfOutlinePixels :: Image Bool -> Double
 numberOfOutlinePixels image = numberOfTruePixels (Repa.traverse image id isOutline) where
-    isOutline i (Z:.y:.x) = not (all (withDefault (extent image) False i) indices) where
-        indices = [Z:.y:.x-1,Z:.y:.x+1,Z:.y-1:.x,Z:.y+1:.x]
+    isOutline i (Z:.y:.x) = not (all (withDefault (extent image) False i) neighbours) where
+        neighbours = [Z:.y:.x-1,Z:.y:.x+1,Z:.y-1:.x,Z:.y+1:.x]
 
 withDefault :: (Shape sh) => sh -> a -> (sh -> a) -> sh -> a
 withDefault shape def image position
     | inShape shape position = image position
     | otherwise = def
 
-horizontalLine :: (Num a) => Int -> Int -> Int -> Image a -> Vector a
+horizontalLine :: Int -> Int -> Int -> Image Word8 -> Vector Word8
 horizontalLine fromx fromy tox image =
     Vector.map (\x -> valueInPoint x fromy image)
         (Vector.enumFromStepN fromx step n) where
             step = signum (tox - fromx)
             n = abs (tox - fromx + 1)
 
-verticalLine :: (Num a) => Int -> Int -> Int -> Image a -> Vector a
+verticalLine :: Int -> Int -> Int -> Image Word8 -> Vector Word8
 verticalLine fromx fromy toy image =
     Vector.map (\y -> valueInPoint fromx y image)
         (Vector.enumFromStepN fromy step n) where
             step = signum (toy - fromy)
             n = abs (toy - fromy + 1)
 
-toLineImages :: [Vector (Vector Word8)] -> Vector (Image Word8)
-toLineImages = Vector.map accumulateImage . sequence
+toLineImages :: [Boxed.Vector (Vector Word8)] -> Boxed.Vector (Image Word8)
+toLineImages = Boxed.fromList . map accumulateImage . transpose . map Boxed.toList
 
 accumulateImage :: [Vector Word8] -> Image Word8
-accumulateImage imagelines = Repa.delay (Repa.fromVector (Z:.h:.w) (Vector.concat imagelines)) where
+accumulateImage imagelines = Repa.delay (Repa.fromUnboxed (Z:.h:.w) (Vector.concat imagelines)) where
     w = length imagelines
     h = case imagelines of
         [] -> 0
@@ -122,9 +123,6 @@ finalizeAverageImage Nothing _ = Nothing
 finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
-
-labelImage :: Image Bool -> Image Int
-labelImage image = arrayToImage (labelArray image)
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do
@@ -163,12 +161,9 @@ labelArray image = runSTArray (do
             writeArray labelimage (x,y) label))     
     return labelimage)
 
-arrayToImage :: Array (Int,Int) a -> Image a
-arrayToImage arr = Repa.delay (Repa.fromListVector shape (elems arr)) where
-    shape = Z:.h:.w
-    w = hx - lx + 1
-    h = hy - ly + 1
-    ((lx,ly),(hx,hy)) = bounds arr
-
-numberOfLabels :: Image Int -> Int
-numberOfLabels image = Set.size (Vector.foldl' (flip Set.insert) Set.empty (Repa.toVector (Repa.computeVectorS image)))
+numberOfLabels :: Array (Int,Int) Int -> Int
+numberOfLabels arr = Set.size (go Set.empty (indices arr)) where
+    go !labels [] = labels
+    go !labels (i:rest)
+        | (arr ! i) == 0 = go labels rest
+        | otherwise = go (Set.insert (arr ! i) labels) rest
