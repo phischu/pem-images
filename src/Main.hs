@@ -8,7 +8,7 @@ import ImageQuery (
         AverageOfImage,AverageAreaOfIslands,AverageOutlineOfIslands),
     LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
-import ImageProcessing (imageToJuicy)
+import ImageProcessing (imageToJuicy,identityStencil)
 
 import Codec.Picture (writeBitmap)
 
@@ -39,7 +39,7 @@ testtablequeries = V.fromList [
     AverageOutlineOfIslands]
 
 testquery :: ImageQuery
-testquery = ImageQuery 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
+testquery = ImageQuery (identityStencil 1080 1032) 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
 main = do

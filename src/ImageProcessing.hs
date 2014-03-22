@@ -3,11 +3,11 @@ module ImageProcessing where
 
 import qualified Data.Array.Repa as Repa (
     Array,
-    sumAllS,map,traverse,delay)
+    sumAllS,map,traverse,delay,zipWith,backpermuteDft)
 import Data.Array.Repa (
     D,DIM2,extent,
-    inShape,(:.)((:.)),Z(Z),index,
-    (+^),Shape)
+    Shape,inShape,(:.)((:.)),Z(Z),index,
+    (+^))
 import qualified Data.Array.Repa.Repr.Unboxed as Repa (
     fromUnboxed,computeUnboxedS)
 import qualified Data.Array.Repa.Repr.Delayed as Repa (
@@ -49,6 +49,15 @@ juicyToImage juicy = Repa.delay (Repa.computeUnboxedS (Repa.fromFunction shape (
 imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
 imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h where
     Z:.h:.w = extent image
+
+identityStencil :: Int -> Int -> Image Bool
+identityStencil width height = Repa.fromFunction (Z:.height:.width) (const True)
+
+applyStencil :: Image Bool -> Image Bool -> Image Bool
+applyStencil stencil image = Repa.delay (Repa.computeUnboxedS (Repa.zipWith (&&) stencil' image)) where
+    shape = extent image
+    stencil' = Repa.backpermuteDft (Repa.fromFunction shape (const True)) indexInShape stencil
+    indexInShape position = if inShape shape position then Just position else Nothing
 
 type Threshold = Word8
 
