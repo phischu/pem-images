@@ -1,9 +1,9 @@
 module ImageQuery where
 
 import ImageProcessing (
-    Image,Threshold,
+    Image,Rect,Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
-    binarize,applyStencil,
+    cutOut,binarize,applyStencil,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage)
@@ -19,6 +19,7 @@ import Data.Vector as Vector (map)
 import qualified Data.Vector.Unboxed as Unboxed (Vector)
 
 data ImageQuery = ImageQuery {
+    cutRect :: Rect,
     stencilImage :: Image Bool,
     binarizationThreshold :: Word8,
     tableQueries :: Vector TableQuery,
@@ -51,13 +52,13 @@ data ImageQueryResult = ImageQueryResult {
 runImageQuery :: ImageQuery -> Fold (Image Word8) ImageQueryResult
 runImageQuery imagequery =
     ImageQueryResult <$>
-    tableFold (stencilImage imagequery) (binarizationThreshold imagequery) (tableQueries imagequery) <*>
+    tableFold (cutRect imagequery) (stencilImage imagequery) (binarizationThreshold imagequery) (tableQueries imagequery) <*>
     lineFold (lineQueries imagequery) <*>
     averageImageFold (averageImageQuery imagequery)
 
 
-tableFold :: Image Bool -> Threshold ->  Vector TableQuery -> Fold (Image Word8) [Vector Double]
-tableFold stencilimage threshold tablequeries = Fold.premap (runTableQueries stencilimage threshold tablequeries) Fold.list
+tableFold :: Rect -> Image Bool -> Threshold ->  Vector TableQuery -> Fold (Image Word8) [Vector Double]
+tableFold rect stencilimage threshold tablequeries = Fold.premap (runTableQueries rect stencilimage threshold tablequeries) Fold.list
 
 runTableQuery :: Image Bool -> Double -> Image Word8 -> TableQuery ->  Double
 runTableQuery _ _ image (ValueInPoint x y) = fromIntegral (valueInPoint x y image)
@@ -67,9 +68,10 @@ runTableQuery _ numberofislands _ NumberOfIslands = numberofislands
 runTableQuery binaryimage numberofislands _ AverageAreaOfIslands = numberOfTruePixels binaryimage / numberofislands
 runTableQuery binaryimage numberofislands _ AverageOutlineOfIslands = numberOfOutlinePixels binaryimage / numberofislands
 
-runTableQueries :: Image Bool -> Threshold -> Vector TableQuery -> Image Word8 -> Vector Double
-runTableQueries stencilimage threshold tablequeries image = Vector.map (runTableQuery maskedimage numberofislands image) tablequeries where
-    binaryimage = binarize threshold image
+runTableQueries :: Rect -> Image Bool -> Threshold -> Vector TableQuery -> Image Word8 -> Vector Double
+runTableQueries rect stencilimage threshold tablequeries image = Vector.map (runTableQuery maskedimage numberofislands image) tablequeries where
+    cutimage = cutOut rect image
+    binaryimage = binarize threshold cutimage
     maskedimage = applyStencil stencilimage binaryimage
     numberofislands = fromIntegral (numberOfIslands binaryimage)
 

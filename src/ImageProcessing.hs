@@ -39,6 +39,7 @@ import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length,concat)
 import qualified Data.Vector as Boxed (Vector,toList,fromList)
 
 type Image a = Repa.Array D DIM2 a
+type Rect = (Int,Int,Int,Int)
 
 juicyToImage :: Juicy.Image Juicy.Pixel8 -> Image Word8
 juicyToImage juicy = Repa.delay (Repa.computeUnboxedS (Repa.fromFunction shape (\(Z:.y:.x) -> Juicy.pixelAt juicy x y))) where
@@ -50,13 +51,18 @@ imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
 imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h where
     Z:.h:.w = extent image
 
+cutOut :: (Num a) => Rect -> Image a -> Image a
+cutOut (x,y,w,h) image = Repa.backpermuteDft (Repa.fromFunction shape (const 0)) indexInShape image where
+    shape = Z:.h:.w
+    indexInShape (Z:.y':.x') = if inShape shape (Z:.y':.x') then Just (Z:.y'+y:.x'+x) else Nothing
+
 identityStencil :: Int -> Int -> Image Bool
 identityStencil width height = Repa.fromFunction (Z:.height:.width) (const True)
 
 applyStencil :: Image Bool -> Image Bool -> Image Bool
 applyStencil stencil image = Repa.delay (Repa.computeUnboxedS (Repa.zipWith (&&) stencil' image)) where
     shape = extent image
-    stencil' = Repa.backpermuteDft (Repa.fromFunction shape (const True)) indexInShape stencil
+    stencil' = Repa.backpermuteDft (Repa.fromFunction shape (const False)) indexInShape stencil
     indexInShape position = if inShape shape position then Just position else Nothing
 
 type Threshold = Word8
