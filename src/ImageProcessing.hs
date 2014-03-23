@@ -65,6 +65,9 @@ applyStencil stencil image = Repa.delay (Repa.computeUnboxedS (Repa.zipWith (&&)
     stencil' = Repa.backpermuteDft (Repa.fromFunction shape (const False)) indexInShape stencil
     indexInShape position = if inShape shape position then Just position else Nothing
 
+invert :: Image Bool -> Image Bool
+invert image = Repa.map not image
+
 type Threshold = Word8
 
 valueInPoint :: (Num a) => Int -> Int -> Image a -> a

@@ -3,7 +3,7 @@ module ImageQuery where
 import ImageProcessing (
     Image,Rect,Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
-    cutOut,binarize,applyStencil,
+    cutOut,binarize,applyStencil,invert,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage)
@@ -30,6 +30,13 @@ data TableQuery =
     ValueInPoint Int Int |
     AverageAroundPoint Int Int Int |
     AverageOfImage |
+    IslandQuery Polarity IslandQuery deriving Show
+
+data Polarity =
+    Dark |
+    Bright deriving Show
+
+data IslandQuery =
     NumberOfIslands |
     AverageAreaOfIslands |
     AverageOutlineOfIslands deriving Show
@@ -60,20 +67,32 @@ runImageQuery imagequery =
 tableFold :: Rect -> Image Bool -> Threshold ->  Vector TableQuery -> Fold (Image Word8) [Vector Double]
 tableFold rect stencilimage threshold tablequeries = Fold.premap (runTableQueries rect stencilimage threshold tablequeries) Fold.list
 
-runTableQuery :: Image Bool -> Double -> Image Word8 -> TableQuery ->  Double
-runTableQuery _ _ image (ValueInPoint x y) = fromIntegral (valueInPoint x y image)
-runTableQuery _ _ image (AverageAroundPoint x y r) = averageAroundPoint x y r image
-runTableQuery _ _ image AverageOfImage = averageOfImage image
-runTableQuery _ numberofislands _ NumberOfIslands = numberofislands
-runTableQuery binaryimage numberofislands _ AverageAreaOfIslands = numberOfTruePixels binaryimage / numberofislands
-runTableQuery binaryimage numberofislands _ AverageOutlineOfIslands = numberOfOutlinePixels binaryimage / numberofislands
+runTableQuery :: Image Bool -> Image Bool -> Double -> Double -> Image Word8 -> TableQuery ->  Double
+runTableQuery _ _ _ _ image (ValueInPoint x y) =
+    fromIntegral (valueInPoint x y image)
+runTableQuery _ _ _ _ image (AverageAroundPoint x y r) =
+    averageAroundPoint x y r image
+runTableQuery _ _ _ _ image AverageOfImage =
+    averageOfImage image
+runTableQuery darkislandimage _ numberofdarkislands _ _ (IslandQuery Dark islandquery) =
+    runIslandQuery darkislandimage numberofdarkislands islandquery
+runTableQuery _ brightislandimage _ numberofbrightislands _ (IslandQuery Bright islandquery) =
+    runIslandQuery brightislandimage numberofbrightislands islandquery
+
+runIslandQuery :: Image Bool -> Double -> IslandQuery -> Double
+runIslandQuery _ numberofislands NumberOfIslands = numberofislands
+runIslandQuery islandimage numberofislands AverageAreaOfIslands = numberOfTruePixels islandimage / numberofislands
+runIslandQuery islandimage numberofislands AverageOutlineOfIslands = numberOfOutlinePixels islandimage / numberofislands
 
 runTableQueries :: Rect -> Image Bool -> Threshold -> Vector TableQuery -> Image Word8 -> Vector Double
-runTableQueries rect stencilimage threshold tablequeries image = Vector.map (runTableQuery maskedimage numberofislands image) tablequeries where
-    cutimage = cutOut rect image
-    binaryimage = binarize threshold cutimage
-    maskedimage = applyStencil stencilimage binaryimage
-    numberofislands = fromIntegral (numberOfIslands binaryimage)
+runTableQueries rect stencilimage threshold tablequeries image =
+    Vector.map (runTableQuery darkislandimage brightislandimage numberofdarkislands numberofbrightislands image) tablequeries where
+        cutimage = cutOut rect image
+        binaryimage = binarize threshold cutimage
+        brightislandimage = applyStencil stencilimage binaryimage
+        darkislandimage = invert brightislandimage
+        numberofdarkislands = fromIntegral (numberOfIslands darkislandimage)
+        numberofbrightislands = fromIntegral (numberOfIslands brightislandimage)
 
 
 lineFold :: Vector LineQuery -> Fold (Image Word8) (Vector (Image Word8))

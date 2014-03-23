@@ -4,8 +4,12 @@ import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQuery(ImageQuery),
     TableQuery(
-        NumberOfIslands,ValueInPoint,AverageAroundPoint,
-        AverageOfImage,AverageAreaOfIslands,AverageOutlineOfIslands),
+        ValueInPoint,AverageAroundPoint,AverageOfImage,
+        IslandQuery),
+    Polarity(
+        Dark, Bright),
+    IslandQuery(
+        NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     LineQuery(HorizontalLine),
     runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
 import ImageProcessing (imageToJuicy,identityStencil)
@@ -31,12 +35,13 @@ testdirectory = "data/2008-05/PEEM08050800/"
 
 testtablequeries :: Vector TableQuery
 testtablequeries = V.fromList [
-    NumberOfIslands,
+    IslandQuery Bright NumberOfIslands,
     AverageAroundPoint 2 126 12,
     ValueInPoint 2 126,
     AverageOfImage,
-    AverageAreaOfIslands,
-    AverageOutlineOfIslands]
+    IslandQuery Bright AverageAreaOfIslands,
+    IslandQuery Bright AverageOutlineOfIslands,
+    IslandQuery Dark NumberOfIslands]
 
 testquery :: ImageQuery
 testquery = ImageQuery (0,0,1080,1032) (identityStencil 1080 1032) 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
