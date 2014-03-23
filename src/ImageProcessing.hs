@@ -109,18 +109,19 @@ withDefault shape def image position
     | otherwise = def
 
 horizontalLine :: Int -> Int -> Int -> Image Word8 -> Vector Word8
-horizontalLine fromx fromy tox image =
+horizontalLine fromx fromy pixelsonline image =
     Vector.map (\x -> valueInPoint x fromy image)
         (Vector.enumFromStepN fromx step n) where
-            step = signum (tox - fromx)
-            n = abs (tox - fromx + 1)
+            step = signum pixelsonline
+            n = abs pixelsonline
 
 verticalLine :: Int -> Int -> Int -> Image Word8 -> Vector Word8
-verticalLine fromx fromy toy image =
+verticalLine fromx fromy pixelsonline image =
     Vector.map (\y -> valueInPoint fromx y image)
         (Vector.enumFromStepN fromy step n) where
-            step = signum (toy - fromy)
-            n = abs (toy - fromy + 1)
+            step = signum pixelsonline
+            n = abs pixelsonline
+
 
 toLineImages :: [Boxed.Vector (Vector Word8)] -> Boxed.Vector (Image Word8)
 toLineImages = Boxed.fromList . map accumulateImage . transpose . map Boxed.toList

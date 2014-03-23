@@ -45,11 +45,11 @@ data LineQuery =
     HorizontalLine {
         fromX :: Int,
         fromY :: Int,
-        toX :: Int} |
+        pixelsOnLine :: Int} |
     VerticalLine {
         fromX :: Int,
         fromY :: Int,
-        toY :: Int} deriving Show
+        pixelsOnLine :: Int} deriving Show
 
 data ImageQueryResult = ImageQueryResult {
     tableRows :: [Vector Double],
@@ -99,8 +99,8 @@ lineFold :: Vector LineQuery -> Fold (Image Word8) (Vector (Image Word8))
 lineFold linequeries = fmap toLineImages (Fold.premap (runLineQueries linequeries) Fold.list)
 
 runLineQuery :: LineQuery -> Image Word8 -> Unboxed.Vector Word8
-runLineQuery (HorizontalLine fromx fromy tox) image = horizontalLine fromx fromy tox image
-runLineQuery (VerticalLine fromx fromy toy) image = verticalLine fromx fromy toy image
+runLineQuery (HorizontalLine fromx fromy pixelsonline) image = horizontalLine fromx fromy pixelsonline image
+runLineQuery (VerticalLine fromx fromy pixelsonline) image = verticalLine fromx fromy pixelsonline image
 
 runLineQueries :: Vector LineQuery -> Image Word8 -> Vector (Unboxed.Vector Word8)
 runLineQueries linequeries image = Vector.map (flip runLineQuery image) linequeries
