@@ -54,7 +54,7 @@ imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h whe
 cutOut :: (Num a) => Rect -> Image a -> Image a
 cutOut (x,y,w,h) image = Repa.backpermuteDft (Repa.fromFunction shape (const 0)) indexInShape image where
     shape = Z:.h:.w
-    indexInShape (Z:.y':.x') = if inShape shape (Z:.y':.x') then Just (Z:.y'+y:.x'+x) else Nothing
+    indexInShape (Z:.y':.x') = if inShape (extent image) (Z:.y'+y:.x'+x) then Just (Z:.y'+y:.x'+x) else Nothing
 
 identityStencil :: Int -> Int -> Image Bool
 identityStencil width height = Repa.fromFunction (Z:.height:.width) (const True)
