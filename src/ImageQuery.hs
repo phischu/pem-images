@@ -90,7 +90,7 @@ runTableQueries rect stencilimage threshold tablequeries image =
         cutimage = cutOut rect image
         binaryimage = binarize threshold cutimage
         brightislandimage = applyStencil stencilimage binaryimage
-        darkislandimage = invert brightislandimage
+        darkislandimage = applyStencil stencilimage (invert binaryimage)
         numberofdarkislands = fromIntegral (numberOfIslands darkislandimage)
         numberofbrightislands = fromIntegral (numberOfIslands brightislandimage)
 
