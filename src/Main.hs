@@ -16,6 +16,9 @@ import ImageProcessing (imageToJuicy,identityStencil)
 
 import Codec.Picture (writeBitmap)
 
+import Graphics.UI.WX (
+    start,frame,set,Prop((:=)),text,visible,on,closing)
+
 import Pipes ((>->))
 import Control.Foldl (purely)
 import Pipes.Prelude (fold)
@@ -47,7 +50,11 @@ testquery :: ImageQuery
 testquery = ImageQuery (0,0,1080,1032) (identityStencil 1080 1032) 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
 
 main :: IO ()
-main = do
+main = start (do
+    frame [text := "wxhNotepad"])
+
+runBatch :: IO ()
+runBatch = do
     result <- runEitherT (purely fold (runImageQuery testquery)
         (imageSeries testdirectory >-> Pipes.take 2))
     case result of
