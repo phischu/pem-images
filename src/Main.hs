@@ -2,16 +2,12 @@ module Main where
 
 import ImageLoading (imageSeries)
 import ImageQuery (
-    ImageQuery(ImageQuery),
-    TableQuery(
-        ValueInPoint,AverageAroundPoint,AverageOfImage,
-        IslandQuery),
-    Polarity(
-        Dark, Bright),
-    IslandQuery(
-        NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
-    LineQuery(HorizontalLine),
-    runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
+    ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
+    ImageQuery(TableQuery),
+    ImageQueryParameter(Threshold),
+    TableQuery(..),
+    Polarity(Dark,Bright),
+    runImageQueries)
 import ImageProcessing (imageToJuicy,identityStencil)
 
 import Codec.Picture (writeBitmap)
@@ -37,25 +33,16 @@ import qualified Data.Csv as Csv (encode)
 testdirectory :: FilePath
 testdirectory = "data/2008-05/testimages/"
 
-testtablequeries :: Vector TableQuery
-testtablequeries = V.fromList [
-    IslandQuery Bright NumberOfIslands,
-    AverageAroundPoint 2 126 12,
-    ValueInPoint 2 126,
-    AverageOfImage,
-    IslandQuery Bright AverageAreaOfIslands,
-    IslandQuery Bright AverageOutlineOfIslands,
-    IslandQuery Dark NumberOfIslands]
+testtablequeries :: [ImageQueryStatement]
+testtablequeries = [
+    SetImageQueryParameter (Threshold 14),
+    GetImageQueryResult (NumberOfIslands Bright),
+    GetImageQueryResult (AverageOutlineOfIslands Bright),
+    GetImageQueryResult (NumberOfIslands Dark),
+    GetImageQueryResult (AverageAroundPoint 2 126 12)]
 
-testquery :: ImageQuery
-testquery = ImageQuery (0,0,1080,1032) (identityStencil 1080 1032) 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
-
-progress :: (MonadIO m) => Pipe a a m r
-progress = flip evalStateT 1 (forever(do
-    n <- get
-    liftIO (putStrLn ("Image: " ++ show n))
-    put (n+1)
-    lift (await >>= yield)))
+imageQueryResultConsumer :: Consumer ImageQueryResult m ()
+imageQueryResultConsumer = undefined
 
 main :: IO ()
 main = do
