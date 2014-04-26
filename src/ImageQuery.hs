@@ -86,7 +86,10 @@ initialImageQueryParameters :: ImageQueryParameters
 initialImageQueryParameters = ImageQueryParameters 0 Nothing Nothing 0 0
 
 outputToResult :: ImageQueryOutput -> ImageQueryResult
-outputToResult = undefined
+outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]}
+outputToResult (AverageImage averageimage) = mempty {_averageImages = [averageimage]}
+outputToResult (TableValue tablevalue) = mempty {_tableRow = [tablevalue]}
+outputToResult (ImageLine imageline) = mempty {_imageLines = [imageline]}
 
 runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image Word8 -> m ImageQueryResult
 runImageQueries imagequerystatements image = flip evalStateT initialImageQueryParameters (do
