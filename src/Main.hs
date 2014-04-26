@@ -15,7 +15,7 @@ import Codec.Picture (writeBitmap)
 import Pipes (runEffect,for,(~>))
 
 import Data.Traversable (forM)
-import Control.Monad (forever)
+import Control.Monad (forever,(>=>))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (evalStateT,get,put)
@@ -39,14 +39,11 @@ testqueries = [
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
 saveResult :: (MonadIO m) => ImageQueryResult -> m ()
-saveResult (OutputImage _) = liftIO (putStrLn "output image")
-saveResult (AverageImage _) = liftIO (putStrLn "average image")
-saveResult (TableValue tablevalue) = liftIO (putStrLn ("table value: " ++ show tablevalue))
-saveResult (ImageLine _) = liftIO (putStrLn "image line")
+saveResult = undefined
 
 main :: IO ()
 main = do
-    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries ~> saveResult)))
+    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries >=> saveResult)))
     case result of
         Left err -> print err
         Right () -> print "alright"
