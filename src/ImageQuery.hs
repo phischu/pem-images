@@ -10,7 +10,7 @@ import ImageProcessing (
 
 import Pipes (Producer,yield,for,each)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict (StateT,get,evalStateT)
+import Control.Monad.Trans.State.Strict (StateT,evalStateT,get,modify)
 import Data.Monoid (Monoid(..))
 import Data.Maybe (catMaybes)
 import Control.Monad (forM)
@@ -63,7 +63,7 @@ data ImageQueryParameters = ImageQueryParameters {
     _channel :: Int,
     _subRect :: Maybe (Int,Int,Int,Int),
     _stencilImage :: Maybe String,
-    _threshold :: Int,
+    _threshold :: Word8,
     _smoothing :: Int}
 
 data ImageQueryResult = ImageQueryResult {
@@ -104,8 +104,17 @@ runImageQuery image (GetImageQueryResult imagequery) = do
     imagequeryparameters <- get
     return (Just (getImageQueryOutput image imagequeryparameters imagequery))
 
-setImageQueryParameter :: ImageQueryParameter -> StateT ImageQueryParameters m ()
-setImageQueryParameter = undefined
+setImageQueryParameter :: (Monad m) => ImageQueryParameter -> StateT ImageQueryParameters m ()
+setImageQueryParameter (Channel channel) =
+    modify (\imagequeryparamters -> imagequeryparamters {_channel = channel})
+setImageQueryParameter (SubRect a1 a2 b1 b2) =
+    modify (\imagequeryparamters -> imagequeryparamters {_subRect = Just (a1,a2,b1,b2)})
+setImageQueryParameter (StencilImage stencilimage) =
+    modify (\imagequeryparamters -> imagequeryparamters {_stencilImage = Just stencilimage})
+setImageQueryParameter (Threshold threshold) =
+    modify (\imagequeryparamters -> imagequeryparamters {_threshold = threshold})
+setImageQueryParameter (Smoothing smoothing) =
+    modify (\imagequeryparamters -> imagequeryparamters {_smoothing = smoothing})
 
 getImageQueryOutput :: Image Word8 -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
 getImageQueryOutput = undefined
