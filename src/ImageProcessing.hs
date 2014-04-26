@@ -94,7 +94,7 @@ binarize :: Threshold -> Image Word8 -> Image Bool
 binarize threshold image = Repa.delay (Repa.computeUnboxedS (Repa.map (\pixelvalue -> pixelvalue > threshold) image))
 
 blackAndWhite :: Image Bool -> Image Word8
-blackAndWhite = Repa.delay .  Repa.computeUnboxedS . Repa.map (\b -> if b then 255 else 0)
+blackAndWhite = Repa.delay . Repa.computeUnboxedS . Repa.map (\b -> if b then 255 else 0)
 
 numberOfTruePixels :: Image Bool -> Double
 numberOfTruePixels image = Repa.sumAllS (Repa.map boolToDouble image) where

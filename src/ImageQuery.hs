@@ -124,4 +124,8 @@ getImageQueryOutput image _ (LineImage Vertical x y l) = ImageLine (verticalLine
 getImageQueryOutput image imagequeryparameters ThresholdedImage = OutputImage (blackAndWhite (binarize threshold image)) where
     threshold = _threshold imagequeryparameters
 
-runTableQuery = undefined
+runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
+runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
+runTableQuery image _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r image)
+runTableQuery image _ AverageOfImage = TableValue (averageOfImage image)
+runTableQuery image _ _ = undefined
