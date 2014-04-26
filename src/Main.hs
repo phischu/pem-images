@@ -39,7 +39,7 @@ testqueries = [
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
 saveResult :: (MonadIO m) => ImageQueryResult -> m ()
-saveResult = undefined
+saveResult = liftIO . print . _tableRow
 
 main :: IO ()
 main = do
