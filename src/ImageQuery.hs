@@ -3,7 +3,7 @@ module ImageQuery where
 import ImageProcessing (
     Image,Rect,Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
-    cutOut,binarize,applyStencil,invert,
+    cutOut,binarize,applyStencil,invert,blackAndWhite,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage)
@@ -34,7 +34,7 @@ data ImageQueryParameter =
     Channel Int |
     SubRect Int Int Int Int |
     StencilImage String |
-    Threshold Word8 |
+    Threshold Threshold |
     Smoothing Int deriving Show
 
 data TableQuery =
@@ -53,24 +53,24 @@ data Polarity =
     Dark |
     Bright deriving Show
 
-data ImageQueryOutput =
-    OutputImage (Image Word8) |
-    AverageImage (Image Word8) |
-    TableValue Double |
-    ImageLine (Unboxed.Vector Double)
-
 data ImageQueryParameters = ImageQueryParameters {
     _channel :: Int,
     _subRect :: Maybe (Int,Int,Int,Int),
     _stencilImage :: Maybe String,
-    _threshold :: Word8,
+    _threshold :: Threshold,
     _smoothing :: Int}
+
+data ImageQueryOutput =
+    OutputImage (Image Word8) |
+    AverageImage (Image Word8) |
+    TableValue Double |
+    ImageLine (Unboxed.Vector Word8)
 
 data ImageQueryResult = ImageQueryResult {
     _outputImages :: [Image Word8],
     _averageImages :: [Image Word8],
     _tableRow :: [Double],
-    _imageLines :: [Unboxed.Vector Double]}
+    _imageLines :: [Unboxed.Vector Word8]}
 
 instance Monoid ImageQueryResult where
     mempty = ImageQueryResult [] [] [] []
@@ -106,17 +106,22 @@ runImageQuery image (GetImageQueryResult imagequery) = do
 
 setImageQueryParameter :: (Monad m) => ImageQueryParameter -> StateT ImageQueryParameters m ()
 setImageQueryParameter (Channel channel) =
-    modify (\imagequeryparamters -> imagequeryparamters {_channel = channel})
+    modify (\imagequeryparameters -> imagequeryparameters {_channel = channel})
 setImageQueryParameter (SubRect a1 a2 b1 b2) =
-    modify (\imagequeryparamters -> imagequeryparamters {_subRect = Just (a1,a2,b1,b2)})
+    modify (\imagequeryparameters -> imagequeryparameters {_subRect = Just (a1,a2,b1,b2)})
 setImageQueryParameter (StencilImage stencilimage) =
-    modify (\imagequeryparamters -> imagequeryparamters {_stencilImage = Just stencilimage})
+    modify (\imagequeryparameters -> imagequeryparameters {_stencilImage = Just stencilimage})
 setImageQueryParameter (Threshold threshold) =
-    modify (\imagequeryparamters -> imagequeryparamters {_threshold = threshold})
+    modify (\imagequeryparameters -> imagequeryparameters {_threshold = threshold})
 setImageQueryParameter (Smoothing smoothing) =
-    modify (\imagequeryparamters -> imagequeryparamters {_smoothing = smoothing})
+    modify (\imagequeryparameters -> imagequeryparameters {_smoothing = smoothing})
 
 getImageQueryOutput :: Image Word8 -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
-getImageQueryOutput = undefined
+getImageQueryOutput image imagequeryparameters (TableQuery tablequery) = runTableQuery image imagequeryparameters tablequery
+getImageQueryOutput image _ ImageOfAverage = AverageImage image
+getImageQueryOutput image _ (LineImage Horizontal x y l) = ImageLine (horizontalLine x y l image)
+getImageQueryOutput image _ (LineImage Vertical x y l) = ImageLine (verticalLine x y l image)
+getImageQueryOutput image imagequeryparameters ThresholdedImage = OutputImage (blackAndWhite (binarize threshold image)) where
+    threshold = _threshold imagequeryparameters
 
-
+runTableQuery = undefined
