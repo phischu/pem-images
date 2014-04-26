@@ -41,9 +41,12 @@ data TableQuery =
     ValueInPoint Int Int |
     AverageAroundPoint Int Int Int |
     AverageOfImage |
-    NumberOfIslands Polarity |
-    AverageAreaOfIslands Polarity |
-    AverageOutlineOfIslands Polarity deriving Show
+    IslandQuery Polarity IslandQuery deriving Show
+
+data IslandQuery =
+    NumberOfIslands |
+    AverageAreaOfIslands |
+    AverageOutlineOfIslands deriving Show
 
 data Orientation =
     Horizontal |
@@ -128,4 +131,16 @@ runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQuery
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
 runTableQuery image _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r image)
 runTableQuery image _ AverageOfImage = TableValue (averageOfImage image)
-runTableQuery image _ _ = undefined
+runTableQuery image imagequeryparameters (IslandQuery polarity islandquery) =
+    runIslandQuery (prepareIslandImage polarity imagequeryparameters image) islandquery
+
+runIslandQuery :: Image Bool -> IslandQuery -> ImageQueryOutput
+runIslandQuery binaryimage NumberOfIslands = TableValue (fromIntegral (numberOfIslands binaryimage))
+runIslandQuery binaryimage AverageAreaOfIslands = TableValue (
+    numberOfTruePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
+runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
+    numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
+
+prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
+prepareIslandImage Bright imagequeryparameters image = binarize (_threshold imagequeryparameters) image
+prepareIslandImage Dark imagequeryparameters image = invert (binarize (_threshold imagequeryparameters) image)

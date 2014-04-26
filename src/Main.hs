@@ -6,6 +6,7 @@ import ImageQuery (
     ImageQuery(TableQuery),
     ImageQueryParameter(Threshold),
     TableQuery(..),
+    IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
@@ -33,9 +34,9 @@ testdirectory = "data/2008-05/testimages/"
 testqueries :: [ImageQueryStatement]
 testqueries = [
     SetImageQueryParameter (Threshold 14),
-    GetImageQueryResult (TableQuery (NumberOfIslands Bright)),
-    GetImageQueryResult (TableQuery (AverageOutlineOfIslands Bright)),
-    GetImageQueryResult (TableQuery (NumberOfIslands Dark)),
+    GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
+    GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
+    GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
 saveResult :: (MonadIO m) => ImageQueryResult -> m ()
