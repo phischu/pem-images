@@ -7,15 +7,12 @@ import ImageQuery (
     ImageQueryParameter(Threshold),
     TableQuery(..),
     Polarity(Dark,Bright),
-    runImageQueries)
+    runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
 
 import Codec.Picture (writeBitmap)
 
-import Pipes ((>->),Pipe,await,yield)
-import Control.Foldl (purely)
-import Pipes.Prelude (fold)
-import qualified Pipes.Prelude as Pipes
+import Pipes (runEffect,for,(~>))
 
 import Data.Traversable (forM)
 import Control.Monad (forever)
@@ -33,25 +30,23 @@ import qualified Data.Csv as Csv (encode)
 testdirectory :: FilePath
 testdirectory = "data/2008-05/testimages/"
 
-testtablequeries :: [ImageQueryStatement]
-testtablequeries = [
+testqueries :: [ImageQueryStatement]
+testqueries = [
     SetImageQueryParameter (Threshold 14),
-    GetImageQueryResult (NumberOfIslands Bright),
-    GetImageQueryResult (AverageOutlineOfIslands Bright),
-    GetImageQueryResult (NumberOfIslands Dark),
-    GetImageQueryResult (AverageAroundPoint 2 126 12)]
+    GetImageQueryResult (TableQuery (NumberOfIslands Bright)),
+    GetImageQueryResult (TableQuery (AverageOutlineOfIslands Bright)),
+    GetImageQueryResult (TableQuery (NumberOfIslands Dark)),
+    GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
-imageQueryResultConsumer :: Consumer ImageQueryResult m ()
-imageQueryResultConsumer = undefined
+saveResult :: (MonadIO m) => ImageQueryResult -> m ()
+saveResult (OutputImage _) = liftIO (putStrLn "output image")
+saveResult (AverageImage _) = liftIO (putStrLn "average image")
+saveResult (TableValue tablevalue) = liftIO (putStrLn ("table value: " ++ show tablevalue))
+saveResult (ImageLine _) = liftIO (putStrLn "image line")
 
 main :: IO ()
 main = do
-    result <- runEitherT (purely fold (runImageQuery testquery)
-        (imageSeries testdirectory >-> progress))
+    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries ~> saveResult)))
     case result of
         Left err -> print err
-        Right imagequeryresult -> do
-            ByteString.writeFile "result.txt" (Csv.encode (tableRows imagequeryresult))
-            forM (V.indexed (lineImages imagequeryresult)) (\(i,image) -> do
-                writeBitmap ("lineimage" ++ show i ++ ".bmp") (imageToJuicy image))
-            maybe (putStrLn "no average image") (writeBitmap "average_image.bmp" . imageToJuicy) (averageImage imagequeryresult)
+        Right () -> print "alright"

@@ -8,9 +8,10 @@ import ImageProcessing (
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage)
 
-import Pipes (Producer,yield)
+import Pipes (Producer,yield,for,each)
+import Pipes.Lift (evalStateP)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State (StateT,get)
+import Control.Monad.Trans.State.Strict (StateT,get)
 
 import Data.Word (Word8)
 
@@ -57,16 +58,16 @@ data ImageQueryResult =
 
 data ImageQueryParameters = ImageQueryParameters {
     _channel :: Int,
-    _subRect :: (Int,Int,Int,Int),
-    _stencilImage :: String,
+    _subRect :: Maybe (Int,Int,Int,Int),
+    _stencilImage :: Maybe String,
     _threshold :: Int,
     _smoothing :: Int}
 
 initialImageQueryParameters :: ImageQueryParameters
-initialImageQueryParameters = undefined
+initialImageQueryParameters = ImageQueryParameters 0 Nothing Nothing 0 0
 
-runImageQueries :: (Monad m) => Image Word8 -> [ImageQueryStatement] -> Producer ImageQueryResult m ()
-runImageQueries = undefined
+runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image Word8 -> Producer ImageQueryResult m ()
+runImageQueries imagequeries image = evalStateP initialImageQueryParameters (for (each imagequeries) (runImageQuery image))
 
 runImageQuery :: (Monad m) => Image Word8 -> ImageQueryStatement -> Producer ImageQueryResult (StateT ImageQueryParameters m) ()
 runImageQuery _ (SetImageQueryParameter imagequeryparameter) = do
