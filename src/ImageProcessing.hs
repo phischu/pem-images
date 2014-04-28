@@ -51,8 +51,8 @@ imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
 imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h where
     Z:.h:.w = extent image
 
-cutOut :: (Num a) => Rect -> Image a -> Image a
-cutOut (x,y,w,h) image = Repa.backpermuteDft (Repa.fromFunction shape (const 0)) indexInShape image where
+cutOut :: Rect -> Image Bool -> Image Bool
+cutOut (x,y,w,h) image = Repa.backpermuteDft (Repa.fromFunction shape (const False)) indexInShape image where
     shape = Z:.h:.w
     indexInShape (Z:.y':.x') = if inShape (extent image) (Z:.y'+y:.x'+x) then Just (Z:.y'+y:.x'+x) else Nothing
 

@@ -36,6 +36,7 @@ testqueries = [
     SetImageQueryParameter (Threshold 14),
     GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
     GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
+    SetImageQueryParameter (Threshold 251),
     GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 

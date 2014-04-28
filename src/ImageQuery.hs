@@ -32,7 +32,7 @@ data ImageQuery =
 
 data ImageQueryParameter =
     Channel Int |
-    SubRect Int Int Int Int |
+    SubRect Rect |
     StencilImage (Image Bool) |
     Threshold Threshold |
     Smoothing Int
@@ -58,7 +58,7 @@ data Polarity =
 
 data ImageQueryParameters = ImageQueryParameters {
     _channel :: Int,
-    _subRect :: Maybe (Int,Int,Int,Int),
+    _subRect :: Maybe Rect,
     _stencilImage :: Maybe (Image Bool),
     _threshold :: Threshold,
     _smoothing :: Int}
@@ -110,7 +110,7 @@ runImageQuery image (GetImageQueryResult imagequery) = do
 setImageQueryParameter :: (Monad m) => ImageQueryParameter -> StateT ImageQueryParameters m ()
 setImageQueryParameter (Channel channel) =
     modify (\imagequeryparameters -> imagequeryparameters {_channel = channel})
-setImageQueryParameter (SubRect a1 a2 b1 b2) =
+setImageQueryParameter (SubRect (a1,a2,b1,b2)) =
     modify (\imagequeryparameters -> imagequeryparameters {_subRect = Just (a1,a2,b1,b2)})
 setImageQueryParameter (StencilImage stencilimage) =
     modify (\imagequeryparameters -> imagequeryparameters {_stencilImage = Just stencilimage})
@@ -142,5 +142,14 @@ runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
     numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
 
 prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
-prepareIslandImage Bright imagequeryparameters image = binarize (_threshold imagequeryparameters) image
-prepareIslandImage Dark imagequeryparameters image = invert (binarize (_threshold imagequeryparameters) image)
+prepareIslandImage polarity imagequeryparameters image = cutimage where
+    binaryimage = binarize (_threshold imagequeryparameters) image
+    invertedimage = case polarity of
+        Bright -> binaryimage
+        Dark -> invert binaryimage
+    stenciledimage = case _stencilImage imagequeryparameters of
+        Nothing -> invertedimage
+        Just stencilimage -> applyStencil stencilimage invertedimage
+    cutimage = case _subRect imagequeryparameters of
+        Nothing -> stenciledimage
+        Just subrect -> cutOut subrect stenciledimage
