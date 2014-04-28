@@ -3,112 +3,153 @@ module ImageQuery where
 import ImageProcessing (
     Image,Rect,Threshold,
     valueInPoint,averageAroundPoint,averageOfImage,
-    cutOut,binarize,applyStencil,invert,
+    cutOut,binarize,applyStencil,invert,blackAndWhite,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine,toLineImages,
     addImage,finalizeAverageImage)
 
+import Pipes (Producer,yield,for,each)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State.Strict (StateT,evalStateT,get,modify)
+import Data.Monoid (Monoid(..))
+import Data.Maybe (catMaybes)
+import Control.Monad (forM)
+import Data.Foldable (foldMap)
+
 import Data.Word (Word8)
 
-import Control.Foldl (Fold(Fold))
-import qualified Control.Foldl as Fold (list,premap,length)
-import Control.Applicative ((<$>),(<*>))
-
-import Data.Vector (Vector)
-import Data.Vector as Vector (map)
 import qualified Data.Vector.Unboxed as Unboxed (Vector)
 
-data ImageQuery = ImageQuery {
-    cutRect :: Rect,
-    stencilImage :: Image Bool,
-    binarizationThreshold :: Word8,
-    tableQueries :: Vector TableQuery,
-    lineQueries :: Vector LineQuery,
-    averageImageQuery :: Bool}
-    
+data ImageQueryStatement =
+    SetImageQueryParameter ImageQueryParameter |
+    GetImageQueryResult ImageQuery
+
+data ImageQuery =
+    TableQuery TableQuery |
+    ImageOfAverage |
+    LineImage Orientation Int Int Int |
+    ThresholdedImage deriving Show
+
+data ImageQueryParameter =
+    Channel Int |
+    SubRect Rect |
+    StencilImage (Image Bool) |
+    Threshold Threshold |
+    Smoothing Int
+
 data TableQuery =
     ValueInPoint Int Int |
     AverageAroundPoint Int Int Int |
     AverageOfImage |
     IslandQuery Polarity IslandQuery deriving Show
 
-data Polarity =
-    Dark |
-    Bright deriving Show
-
 data IslandQuery =
     NumberOfIslands |
     AverageAreaOfIslands |
     AverageOutlineOfIslands deriving Show
 
-data LineQuery =
-    HorizontalLine {
-        fromX :: Int,
-        fromY :: Int,
-        pixelsOnLine :: Int} |
-    VerticalLine {
-        fromX :: Int,
-        fromY :: Int,
-        pixelsOnLine :: Int} deriving Show
+data Orientation =
+    Horizontal |
+    Vertical deriving Show
+
+data Polarity =
+    Dark |
+    Bright deriving Show
+
+data ImageQueryParameters = ImageQueryParameters {
+    _channel :: Int,
+    _subRect :: Maybe Rect,
+    _stencilImage :: Maybe (Image Bool),
+    _threshold :: Threshold,
+    _smoothing :: Int}
+
+data ImageQueryOutput =
+    OutputImage (Image Word8) |
+    AverageImage (Image Word8) |
+    TableValue Double |
+    ImageLine (Unboxed.Vector Word8)
 
 data ImageQueryResult = ImageQueryResult {
-    tableRows :: [Vector Double],
-    lineImages :: Vector (Image Word8),
-    averageImage :: Maybe (Image Word8)}
+    _outputImages :: [Image Word8],
+    _averageImages :: [Image Word8],
+    _tableRow :: [Double],
+    _imageLines :: [Unboxed.Vector Word8]}
 
-runImageQuery :: ImageQuery -> Fold (Image Word8) ImageQueryResult
-runImageQuery imagequery =
-    ImageQueryResult <$>
-    tableFold (cutRect imagequery) (stencilImage imagequery) (binarizationThreshold imagequery) (tableQueries imagequery) <*>
-    lineFold (lineQueries imagequery) <*>
-    averageImageFold (averageImageQuery imagequery)
+instance Monoid ImageQueryResult where
+    mempty = ImageQueryResult [] [] [] []
+    mappend
+        (ImageQueryResult outputimages1 averageimages1 tablerow1 imagelines1)
+        (ImageQueryResult outputimages2 averageimages2 tablerow2 imagelines2) = ImageQueryResult
+            (mappend outputimages1 outputimages2)
+            (mappend averageimages1 averageimages2)
+            (mappend tablerow1 tablerow2)
+            (mappend imagelines1 imagelines2)
 
+initialImageQueryParameters :: ImageQueryParameters
+initialImageQueryParameters = ImageQueryParameters 0 Nothing Nothing 0 0
 
-tableFold :: Rect -> Image Bool -> Threshold ->  Vector TableQuery -> Fold (Image Word8) [Vector Double]
-tableFold rect stencilimage threshold tablequeries = Fold.premap (runTableQueries rect stencilimage threshold tablequeries) Fold.list
+outputToResult :: ImageQueryOutput -> ImageQueryResult
+outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]}
+outputToResult (AverageImage averageimage) = mempty {_averageImages = [averageimage]}
+outputToResult (TableValue tablevalue) = mempty {_tableRow = [tablevalue]}
+outputToResult (ImageLine imageline) = mempty {_imageLines = [imageline]}
 
-runTableQuery :: Image Bool -> Image Bool -> Double -> Double -> Image Word8 -> TableQuery ->  Double
-runTableQuery _ _ _ _ image (ValueInPoint x y) =
-    fromIntegral (valueInPoint x y image)
-runTableQuery _ _ _ _ image (AverageAroundPoint x y r) =
-    averageAroundPoint x y r image
-runTableQuery _ _ _ _ image AverageOfImage =
-    averageOfImage image
-runTableQuery darkislandimage _ numberofdarkislands _ _ (IslandQuery Dark islandquery) =
-    runIslandQuery darkislandimage numberofdarkislands islandquery
-runTableQuery _ brightislandimage _ numberofbrightislands _ (IslandQuery Bright islandquery) =
-    runIslandQuery brightislandimage numberofbrightislands islandquery
+runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image Word8 -> m ImageQueryResult
+runImageQueries imagequerystatements image = flip evalStateT initialImageQueryParameters (do
+    imagequeryoutputs <- forM imagequerystatements (runImageQuery image)
+    return (foldMap outputToResult (catMaybes imagequeryoutputs)))
 
-runIslandQuery :: Image Bool -> Double -> IslandQuery -> Double
-runIslandQuery _ numberofislands NumberOfIslands = numberofislands
-runIslandQuery islandimage numberofislands AverageAreaOfIslands = numberOfTruePixels islandimage / numberofislands
-runIslandQuery islandimage numberofislands AverageOutlineOfIslands = numberOfOutlinePixels islandimage / numberofislands
+runImageQuery :: (Monad m) => Image Word8 -> ImageQueryStatement -> StateT ImageQueryParameters m (Maybe ImageQueryOutput)
+runImageQuery _ (SetImageQueryParameter imagequeryparameter) = do
+    setImageQueryParameter imagequeryparameter
+    return Nothing
+runImageQuery image (GetImageQueryResult imagequery) = do
+    imagequeryparameters <- get
+    return (Just (getImageQueryOutput image imagequeryparameters imagequery))
 
-runTableQueries :: Rect -> Image Bool -> Threshold -> Vector TableQuery -> Image Word8 -> Vector Double
-runTableQueries rect stencilimage threshold tablequeries image =
-    Vector.map (runTableQuery darkislandimage brightislandimage numberofdarkislands numberofbrightislands image) tablequeries where
-        cutimage = cutOut rect image
-        binaryimage = binarize threshold cutimage
-        brightislandimage = applyStencil stencilimage binaryimage
-        darkislandimage = applyStencil stencilimage (invert binaryimage)
-        numberofdarkislands = fromIntegral (numberOfIslands darkislandimage)
-        numberofbrightislands = fromIntegral (numberOfIslands brightislandimage)
+setImageQueryParameter :: (Monad m) => ImageQueryParameter -> StateT ImageQueryParameters m ()
+setImageQueryParameter (Channel channel) =
+    modify (\imagequeryparameters -> imagequeryparameters {_channel = channel})
+setImageQueryParameter (SubRect (a1,a2,b1,b2)) =
+    modify (\imagequeryparameters -> imagequeryparameters {_subRect = Just (a1,a2,b1,b2)})
+setImageQueryParameter (StencilImage stencilimage) =
+    modify (\imagequeryparameters -> imagequeryparameters {_stencilImage = Just stencilimage})
+setImageQueryParameter (Threshold threshold) =
+    modify (\imagequeryparameters -> imagequeryparameters {_threshold = threshold})
+setImageQueryParameter (Smoothing smoothing) =
+    modify (\imagequeryparameters -> imagequeryparameters {_smoothing = smoothing})
 
+getImageQueryOutput :: Image Word8 -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
+getImageQueryOutput image imagequeryparameters (TableQuery tablequery) = runTableQuery image imagequeryparameters tablequery
+getImageQueryOutput image _ ImageOfAverage = AverageImage image
+getImageQueryOutput image _ (LineImage Horizontal x y l) = ImageLine (horizontalLine x y l image)
+getImageQueryOutput image _ (LineImage Vertical x y l) = ImageLine (verticalLine x y l image)
+getImageQueryOutput image imagequeryparameters ThresholdedImage = OutputImage (blackAndWhite (binarize threshold image)) where
+    threshold = _threshold imagequeryparameters
 
-lineFold :: Vector LineQuery -> Fold (Image Word8) (Vector (Image Word8))
-lineFold linequeries = fmap toLineImages (Fold.premap (runLineQueries linequeries) Fold.list)
+runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
+runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
+runTableQuery image _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r image)
+runTableQuery image _ AverageOfImage = TableValue (averageOfImage image)
+runTableQuery image imagequeryparameters (IslandQuery polarity islandquery) =
+    runIslandQuery (prepareIslandImage polarity imagequeryparameters image) islandquery
 
-runLineQuery :: LineQuery -> Image Word8 -> Unboxed.Vector Word8
-runLineQuery (HorizontalLine fromx fromy pixelsonline) image = horizontalLine fromx fromy pixelsonline image
-runLineQuery (VerticalLine fromx fromy pixelsonline) image = verticalLine fromx fromy pixelsonline image
+runIslandQuery :: Image Bool -> IslandQuery -> ImageQueryOutput
+runIslandQuery binaryimage NumberOfIslands = TableValue (fromIntegral (numberOfIslands binaryimage))
+runIslandQuery binaryimage AverageAreaOfIslands = TableValue (
+    numberOfTruePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
+runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
+    numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
 
-runLineQueries :: Vector LineQuery -> Image Word8 -> Vector (Unboxed.Vector Word8)
-runLineQueries linequeries image = Vector.map (flip runLineQuery image) linequeries
-
-
-averageImageFold :: Bool -> Fold (Image Word8) (Maybe (Image Word8))
-averageImageFold False = Fold const () (const Nothing)
-averageImageFold True = finalizeAverageImage <$> sumImageFold <*> Fold.length
-
-sumImageFold :: Fold (Image Word8) (Maybe (Image Integer))
-sumImageFold = Fold addImage Nothing id
+prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
+prepareIslandImage polarity imagequeryparameters image = cutimage where
+    binaryimage = binarize (_threshold imagequeryparameters) image
+    invertedimage = case polarity of
+        Bright -> binaryimage
+        Dark -> invert binaryimage
+    stenciledimage = case _stencilImage imagequeryparameters of
+        Nothing -> invertedimage
+        Just stencilimage -> applyStencil stencilimage invertedimage
+    cutimage = case _subRect imagequeryparameters of
+        Nothing -> stenciledimage
+        Just subrect -> cutOut subrect stenciledimage

@@ -2,16 +2,13 @@ module Main where
 
 import ImageLoading (imageSeries)
 import ImageQuery (
-    ImageQuery(ImageQuery),
-    TableQuery(
-        ValueInPoint,AverageAroundPoint,AverageOfImage,
-        IslandQuery),
-    Polarity(
-        Dark, Bright),
-    IslandQuery(
-        NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
-    LineQuery(HorizontalLine),
-    runImageQuery,ImageQueryResult(tableRows,lineImages,averageImage))
+    ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
+    ImageQuery(TableQuery),
+    ImageQueryParameter(Threshold),
+    TableQuery(..),
+    IslandQuery(..),
+    Polarity(Dark,Bright),
+    runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
 
 import Codec.Picture (writeBitmap)
@@ -25,6 +22,10 @@ import Pipes.Prelude (fold)
 import qualified Pipes.Prelude as Pipes
 
 import Data.Traversable (forM)
+import Control.Monad (forever,(>=>))
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.IO.Class (MonadIO,liftIO)
+import Control.Monad.Trans.State (evalStateT,get,put)
 
 import Control.Error (EitherT,runEitherT)
 import Data.Vector (Vector)
@@ -34,20 +35,19 @@ import qualified Data.ByteString.Lazy as ByteString (writeFile)
 import qualified Data.Csv as Csv (encode)
 
 testdirectory :: FilePath
-testdirectory = "data/2008-05/PEEM08050800/"
+testdirectory = "data/2008-05/testimages/"
 
-testtablequeries :: Vector TableQuery
-testtablequeries = V.fromList [
-    IslandQuery Bright NumberOfIslands,
-    AverageAroundPoint 2 126 12,
-    ValueInPoint 2 126,
-    AverageOfImage,
-    IslandQuery Bright AverageAreaOfIslands,
-    IslandQuery Bright AverageOutlineOfIslands,
-    IslandQuery Dark NumberOfIslands]
+testqueries :: [ImageQueryStatement]
+testqueries = [
+    SetImageQueryParameter (Threshold 14),
+    GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
+    GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
+    SetImageQueryParameter (Threshold 251),
+    GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
+    GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
-testquery :: ImageQuery
-testquery = ImageQuery (0,0,1080,1032) (identityStencil 1080 1032) 20 testtablequeries (V.fromList [HorizontalLine (-3) 14 12]) True
+saveResult :: (MonadIO m) => ImageQueryResult -> m ()
+saveResult = liftIO . print . _tableRow
 
 main :: IO ()
 main = start (do
@@ -55,12 +55,7 @@ main = start (do
 
 runBatch :: IO ()
 runBatch = do
-    result <- runEitherT (purely fold (runImageQuery testquery)
-        (imageSeries testdirectory >-> Pipes.take 2))
+    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries >=> saveResult)))
     case result of
         Left err -> print err
-        Right imagequeryresult -> do
-            ByteString.writeFile "result.txt" (Csv.encode (tableRows imagequeryresult))
-            forM (V.indexed (lineImages imagequeryresult)) (\(i,image) -> do
-                writeBitmap ("lineimage" ++ show i ++ ".bmp") (imageToJuicy image))
-            maybe (putStrLn "no average image") (writeBitmap "average_image.bmp" . imageToJuicy) (averageImage imagequeryresult)
+        Right () -> print "alright"
