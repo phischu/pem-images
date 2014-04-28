@@ -5,9 +5,9 @@ import ImageProcessing (Image,juicyToImage)
 import Pipes
 import qualified Pipes.Prelude as Pipes
 
-import qualified Codec.Picture as Juicy (Image,Pixel8,PixelRGB8)
-import Codec.Picture (readBitmap,DynamicImage(ImageRGB8,ImageY8))
-import Codec.Picture.Types (extractComponent,PlaneRed(PlaneRed))
+import qualified Codec.Picture as Juicy (Image,Pixel8,PixelRGB8,PixelYCbCr8)
+import Codec.Picture (readImage,DynamicImage(ImageRGB8,ImageY8,ImageYCbCr8))
+import Codec.Picture.Types (extractComponent,PlaneRed(PlaneRed),PlaneLuma(PlaneLuma))
 
 import Data.Word (Word8)
 
@@ -32,13 +32,16 @@ filesInDirectory directorypath = do
 
 loadImage :: (MonadIO m) => FilePath -> EitherT ImageLoadingError m (Juicy.Image Juicy.Pixel8)
 loadImage imagepath = do
-    eitherdynamicimage <- liftIO (readBitmap imagepath)
+    eitherdynamicimage <- liftIO (readImage imagepath)
     case eitherdynamicimage of
         Left readimageerror -> left (ReadImageError readimageerror)
-        Right (ImageRGB8 image) -> return (chooseChannel image)
+        Right (ImageRGB8 image) -> return (chooseRedChannel image)
         Right (ImageY8 image) -> return image
+        Right (ImageYCbCr8 image) -> return (chooseYChannel image )
         _ -> left ImageFormatError
 
-chooseChannel :: Juicy.Image Juicy.PixelRGB8 -> Juicy.Image Juicy.Pixel8
-chooseChannel = extractComponent PlaneRed
+chooseRedChannel :: Juicy.Image Juicy.PixelRGB8 -> Juicy.Image Juicy.Pixel8
+chooseRedChannel = extractComponent PlaneRed
 
+chooseYChannel :: Juicy.Image Juicy.PixelYCbCr8 -> Juicy.Image Juicy.Pixel8
+chooseYChannel = extractComponent PlaneLuma

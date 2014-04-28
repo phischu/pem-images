@@ -3,7 +3,7 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQuery(TableQuery,ThresholdedImage),
+    ImageQuery(TableQuery,IslandImage),
     ImageQueryParameter(Threshold),
     TableQuery(..),
     IslandQuery(..),
@@ -41,18 +41,23 @@ import Codec.Picture (writeBitmap)
 import Data.IORef (IORef,newIORef,readIORef,writeIORef)
 
 testdirectory :: FilePath
-testdirectory = "data/2008-05/testimages/"
+testdirectory = "data/small_dark_islands/"
 
 testqueries :: [ImageQueryStatement]
 testqueries = [
     SetImageQueryParameter (Threshold 14),
     GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
     GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
-    GetImageQueryResult ThresholdedImage,
+    GetImageQueryResult (IslandImage Dark),
     SetImageQueryParameter (Threshold 251),
-    GetImageQueryResult ThresholdedImage,
+    GetImageQueryResult (IslandImage Bright),
     GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
+
+differentThresholds :: [ImageQueryStatement]
+differentThresholds = do
+    threshold <- [0,8..255]
+    [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
 
 saveResult :: (MonadIO m) => IORef Int -> ImageQueryResult -> m ()
 saveResult countref imagequeryresult = liftIO (do

@@ -28,7 +28,7 @@ data ImageQuery =
     TableQuery TableQuery |
     ImageOfAverage |
     LineImage Orientation Int Int Int |
-    ThresholdedImage deriving Show
+    IslandImage Polarity deriving Show
 
 data ImageQueryParameter =
     Channel Int |
@@ -124,8 +124,8 @@ getImageQueryOutput image imagequeryparameters (TableQuery tablequery) = runTabl
 getImageQueryOutput image _ ImageOfAverage = AverageImage image
 getImageQueryOutput image _ (LineImage Horizontal x y l) = ImageLine (horizontalLine x y l image)
 getImageQueryOutput image _ (LineImage Vertical x y l) = ImageLine (verticalLine x y l image)
-getImageQueryOutput image imagequeryparameters ThresholdedImage = OutputImage (blackAndWhite (binarize threshold image)) where
-    threshold = _threshold imagequeryparameters
+getImageQueryOutput image imagequeryparameters (IslandImage polarity) =
+    OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters image))
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
