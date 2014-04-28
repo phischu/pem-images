@@ -81,7 +81,7 @@ runBatch = do
     createDirectoryIfMissing True "result"
     createDirectoryIfMissing True ("result" </> "intermediateimages")
     countref <- newIORef 0
-    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries >=> saveResult countref)))
+    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries differentThresholds >=> saveResult countref)))
     case result of
         Left err -> print err
         Right () -> print "alright"
