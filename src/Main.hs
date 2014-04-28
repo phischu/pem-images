@@ -14,7 +14,9 @@ import ImageProcessing (imageToJuicy,identityStencil)
 import Codec.Picture (writeBitmap)
 
 import Graphics.UI.WX (
-    start,frame,set,Prop((:=)),text,visible,on,closing)
+    start,frameLoadRes,Prop((:=)),sz,clientSize)
+import Graphics.UI.WXCore (
+    windowShow)
 
 import Pipes (runEffect,(>->),for)
 import Control.Foldl (purely)
@@ -51,7 +53,9 @@ saveResult = liftIO . print . _tableRow
 
 main :: IO ()
 main = start (do
-    frame [text := "wxhNotepad"])
+    f <- frameLoadRes "GUI.xrc" "MainFrame" []
+    windowShow f
+    return ())
 
 runBatch :: IO ()
 runBatch = do
