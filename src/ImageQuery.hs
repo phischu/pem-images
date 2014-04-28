@@ -22,7 +22,7 @@ import qualified Data.Vector.Unboxed as Unboxed (Vector)
 
 data ImageQueryStatement =
     SetImageQueryParameter ImageQueryParameter |
-    GetImageQueryResult ImageQuery deriving Show
+    GetImageQueryResult ImageQuery
 
 data ImageQuery =
     TableQuery TableQuery |
@@ -33,9 +33,9 @@ data ImageQuery =
 data ImageQueryParameter =
     Channel Int |
     SubRect Int Int Int Int |
-    StencilImage String |
+    StencilImage (Image Bool) |
     Threshold Threshold |
-    Smoothing Int deriving Show
+    Smoothing Int
 
 data TableQuery =
     ValueInPoint Int Int |
@@ -59,7 +59,7 @@ data Polarity =
 data ImageQueryParameters = ImageQueryParameters {
     _channel :: Int,
     _subRect :: Maybe (Int,Int,Int,Int),
-    _stencilImage :: Maybe String,
+    _stencilImage :: Maybe (Image Bool),
     _threshold :: Threshold,
     _smoothing :: Int}
 
