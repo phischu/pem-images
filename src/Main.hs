@@ -3,7 +3,7 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQuery(TableQuery),
+    ImageQuery(TableQuery,ThresholdedImage),
     ImageQueryParameter(Threshold),
     TableQuery(..),
     IslandQuery(..),
@@ -35,6 +35,10 @@ import Data.Vector as V (fromList,indexed)
 import qualified Data.ByteString.Lazy as ByteString (writeFile)
 
 import qualified Data.Csv as Csv (encode)
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath ((</>))
+import Codec.Picture (writeBitmap)
+import Data.IORef (IORef,newIORef,readIORef,writeIORef)
 
 testdirectory :: FilePath
 testdirectory = "data/2008-05/testimages/"
@@ -44,22 +48,35 @@ testqueries = [
     SetImageQueryParameter (Threshold 14),
     GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
     GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
+    GetImageQueryResult ThresholdedImage,
     SetImageQueryParameter (Threshold 251),
+    GetImageQueryResult ThresholdedImage,
     GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
 
-saveResult :: (MonadIO m) => ImageQueryResult -> m ()
-saveResult = liftIO . print . _tableRow
+saveResult :: (MonadIO m) => IORef Int -> ImageQueryResult -> m ()
+saveResult countref imagequeryresult = liftIO (do
+    c <- readIORef countref
+    writeIORef countref (c+1)
+    forM (zip [0..] (_outputImages imagequeryresult)) (\(i,image) -> do
+        writeBitmap ("result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp") (imageToJuicy image))
+    print (_tableRow imagequeryresult))
 
 main :: IO ()
-main = start (do
+main = runBatch
+
+gui :: IO ()
+gui = start (do
     f <- frameLoadRes "GUI.xrc" "MainFrame" []
     windowShow f
     return ())
 
 runBatch :: IO ()
 runBatch = do
-    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries >=> saveResult)))
+    createDirectoryIfMissing True "result"
+    createDirectoryIfMissing True ("result" </> "intermediateimages")
+    countref <- newIORef 0
+    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries testqueries >=> saveResult countref)))
     case result of
         Left err -> print err
         Right () -> print "alright"
