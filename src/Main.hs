@@ -16,7 +16,7 @@ import Codec.Picture (writeBitmap)
 import Graphics.UI.WX (
     start,frame,set,Prop((:=)),text,visible,on,closing)
 
-import Pipes ((>->))
+import Pipes (runEffect,(>->),for)
 import Control.Foldl (purely)
 import Pipes.Prelude (fold)
 import qualified Pipes.Prelude as Pipes
