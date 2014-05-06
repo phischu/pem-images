@@ -10,6 +10,7 @@ import ImageQuery (
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
+import ImageQuery.Parser (parseImageQueries)
 
 import Codec.Picture (writeBitmap)
 
@@ -29,7 +30,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (evalStateT,get,put)
 
-import Control.Error (EitherT,runEitherT)
+import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
 import Data.Vector (Vector)
 import Data.Vector as V (fromList,indexed)
 import qualified Data.ByteString.Lazy as ByteString (writeFile)
@@ -68,7 +69,7 @@ saveResult countref imagequeryresult = liftIO (do
     print (_tableRow imagequeryresult))
 
 main :: IO ()
-main = runBatch
+main = runBatch "test.imagequery" >>= either putStrLn (const (putStrLn "success"))
 
 gui :: IO ()
 gui = start (do
@@ -76,12 +77,15 @@ gui = start (do
     windowShow f
     return ())
 
-runBatch :: IO ()
-runBatch = do
-    createDirectoryIfMissing True "result"
-    createDirectoryIfMissing True ("result" </> "intermediateimages")
-    countref <- newIORef 0
-    result <- runEitherT (runEffect (for (imageSeries testdirectory) (runImageQueries differentThresholds >=> saveResult countref)))
-    case result of
-        Left err -> print err
-        Right () -> print "alright"
+runBatch :: FilePath -> IO (Either String ())
+runBatch queryfilename = runEitherT (do
+    queryfile <- scriptIO (readFile queryfilename)
+    querystatements <- hoistEither (parseImageQueries queryfile)
+    scriptIO (createDirectoryIfMissing True "result")
+    scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
+    countref <- scriptIO (newIORef 0)
+    runEffect (for (imageSeries testdirectory) (
+        runImageQueries querystatements >=> saveResult countref)) `onFailure` show)
+
+onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
+onFailure = flip fmapLT
