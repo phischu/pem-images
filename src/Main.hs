@@ -10,7 +10,7 @@ import ImageQuery (
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
-import ImageQuery.Parser (parseImageQueries)
+import ImageQuery.Parser (imagequeriesparser)
 
 import Codec.Picture (writeBitmap)
 
@@ -34,6 +34,8 @@ import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
 import Data.Vector (Vector)
 import Data.Vector as V (fromList,indexed)
 import qualified Data.ByteString.Lazy as ByteString (writeFile)
+
+import Text.Parsec.String (parseFromFile)
 
 import qualified Data.Csv as Csv (encode)
 import System.Directory (createDirectoryIfMissing)
@@ -79,13 +81,13 @@ gui = start (do
 
 runBatch :: FilePath -> IO (Either String ())
 runBatch queryfilename = runEitherT (do
-    queryfile <- scriptIO (readFile queryfilename)
-    querystatements <- hoistEither (parseImageQueries queryfile)
+    parseresult <- scriptIO (parseFromFile imagequeriesparser queryfilename)
+    imagequerystatements <- hoistEither parseresult `onFailure` show
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
     countref <- scriptIO (newIORef 0)
     runEffect (for (imageSeries testdirectory) (
-        runImageQueries querystatements >=> saveResult countref)) `onFailure` show)
+        runImageQueries imagequerystatements >=> saveResult countref)) `onFailure` show)
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT

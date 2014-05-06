@@ -1,9 +1,10 @@
 module ImageQuery.Parser where
 
 import ImageQuery (ImageQueryStatement)
+import Text.Parsec.String (Parser)
 
-parseImageQueries :: String -> Either String [ImageQueryStatement]
-parseImageQueries imagequeriesstring = mapM parseImageQuery (lines imagequeriesstring)
+imagequeriesparser :: Parser [ImageQueryStatement]
+imagequeriesparser = undefined
 
 parseImageQuery :: String -> Either String ImageQueryStatement
 parseImageQuery = undefined
