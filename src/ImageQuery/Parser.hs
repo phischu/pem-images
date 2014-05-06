@@ -7,11 +7,11 @@ import ImageQuery (
     TableQuery(ValueInPoint),
     Polarity(Bright,Dark))
 import Text.Parsec (
-    sepBy,newline,choice,try,string,spaces,digit,many1,(<|>))
+    sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>))
 import Text.Parsec.String (Parser)
 
 imageQueriesParser :: Parser [ImageQueryStatement]
-imageQueriesParser = imageQueryParser `sepBy` newline
+imageQueriesParser = imageQueryParser `sepEndBy` newline
 
 imageQueryParser :: Parser ImageQueryStatement
 imageQueryParser = choice [setPropertyParser,tableQuueryParser,outputParser]
