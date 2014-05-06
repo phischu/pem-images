@@ -10,7 +10,7 @@ import ImageQuery (
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
 import ImageProcessing (imageToJuicy,identityStencil)
-import ImageQuery.Parser (imagequeriesparser)
+import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (writeBitmap)
 
@@ -81,7 +81,7 @@ gui = start (do
 
 runBatch :: FilePath -> IO (Either String ())
 runBatch queryfilename = runEitherT (do
-    parseresult <- scriptIO (parseFromFile imagequeriesparser queryfilename)
+    parseresult <- scriptIO (parseFromFile imageQueriesParser queryfilename)
     imagequerystatements <- hoistEither parseresult `onFailure` show
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
