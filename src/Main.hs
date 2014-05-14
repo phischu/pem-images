@@ -9,38 +9,28 @@ import ImageQuery (
     IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
-import ImageProcessing (imageToJuicy,identityStencil)
+import ImageProcessing (imageToJuicy)
 import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (writeBitmap)
 
 import Graphics.UI.WX (
-    start,frameLoadRes,Prop((:=)),sz,clientSize)
+    start,frameLoadRes)
 import Graphics.UI.WXCore (
     windowShow)
 
-import Pipes (runEffect,(>->),for)
-import Control.Foldl (purely)
-import Pipes.Prelude (fold)
-import qualified Pipes.Prelude as Pipes
+import Pipes (runEffect,for)
 
 import Data.Traversable (forM)
-import Control.Monad (forever,(>=>))
-import Control.Monad.Trans.Class (lift)
+import Control.Monad ((>=>))
 import Control.Monad.IO.Class (MonadIO,liftIO)
-import Control.Monad.Trans.State (evalStateT,get,put)
 
 import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
-import Data.Vector (Vector)
-import Data.Vector as V (fromList,indexed)
-import qualified Data.ByteString.Lazy as ByteString (writeFile)
 
 import Text.Parsec.String (parseFromFile)
 
-import qualified Data.Csv as Csv (encode)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
-import Codec.Picture (writeBitmap)
 import Data.IORef (IORef,newIORef,readIORef,writeIORef)
 
 testdirectory :: FilePath
@@ -67,8 +57,11 @@ saveResult countref imagequeryresult = liftIO (do
     c <- readIORef countref
     writeIORef countref (c+1)
     forM (zip [0..] (_outputImages imagequeryresult)) (\(i,image) -> do
-        writeBitmap ("result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp") (imageToJuicy image))
+        writeBitmap (intermediateImagePath i c) (imageToJuicy image))
     print (_tableRow imagequeryresult))
+
+intermediateImagePath :: Int -> Int -> FilePath
+intermediateImagePath i c = "result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp"
 
 main :: IO ()
 main = runBatch "test.imagequery" >>= either putStrLn (const (putStrLn "success"))

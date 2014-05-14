@@ -5,11 +5,8 @@ import ImageProcessing (
     valueInPoint,averageAroundPoint,averageOfImage,
     cutOut,binarize,applyStencil,invert,blackAndWhite,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
-    horizontalLine,verticalLine,toLineImages,
-    addImage,finalizeAverageImage)
+    horizontalLine,verticalLine)
 
-import Pipes (Producer,yield,for,each)
-import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT,evalStateT,get,modify)
 import Data.Monoid (Monoid(..))
 import Data.Maybe (catMaybes)
