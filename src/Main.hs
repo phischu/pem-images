@@ -9,20 +9,20 @@ import ImageQuery (
     IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
-import ImageProcessing (imageToJuicy)
+import ImageProcessing (Image,imageToJuicy)
 import ImageQuery.Parser (imageQueriesParser)
 
-import Codec.Picture (writeBitmap)
+import Codec.Picture (Pixel8,writeBitmap)
 
 import Graphics.UI.WX (
     start,frameLoadRes)
 import Graphics.UI.WXCore (
     windowShow)
 
-import Pipes (runEffect,for)
+import Pipes (Consumer,runEffect,(>->),await)
+import qualified Pipes.Prelude as Pipes (mapM)
 
 import Data.Traversable (forM)
-import Control.Monad ((>=>))
 import Control.Monad.IO.Class (MonadIO,liftIO)
 
 import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
@@ -31,7 +31,6 @@ import Text.Parsec.String (parseFromFile)
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
-import Data.IORef (IORef,newIORef,readIORef,writeIORef)
 
 testdirectory :: FilePath
 testdirectory = "data/small_dark_islands/"
@@ -52,13 +51,18 @@ differentThresholds = do
     threshold <- [0,8..255]
     [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
 
-saveResult :: (MonadIO m) => IORef Int -> ImageQueryResult -> m ()
-saveResult countref imagequeryresult = liftIO (do
-    c <- readIORef countref
-    writeIORef countref (c+1)
-    forM (zip [0..] (_outputImages imagequeryresult)) (\(i,image) -> do
-        writeBitmap (intermediateImagePath i c) (imageToJuicy image))
-    print (_tableRow imagequeryresult))
+consumeResults :: (MonadIO m) => Consumer ImageQueryResult m r
+consumeResults = go 1 where
+    go n = do
+        imagequeryresult <- await
+        liftIO (do
+            saveIntermediateImages n (_outputImages imagequeryresult)
+            print (_tableRow imagequeryresult))
+        go (n+1)
+
+saveIntermediateImages :: Int -> [Image Pixel8] -> IO [()]
+saveIntermediateImages n outputimages = liftIO (forM (zip [0..] outputimages) (\(i,image) -> do
+    writeBitmap (intermediateImagePath i n) (imageToJuicy image)))
 
 intermediateImagePath :: Int -> Int -> FilePath
 intermediateImagePath i c = "result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp"
@@ -78,9 +82,10 @@ runBatch queryfilename = runEitherT (do
     imagequerystatements <- hoistEither parseresult `onFailure` show
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
-    countref <- scriptIO (newIORef 0)
-    runEffect (for (imageSeries testdirectory) (
-        runImageQueries imagequerystatements >=> saveResult countref)) `onFailure` show)
+    runEffect (
+        imageSeries testdirectory >->
+        Pipes.mapM (runImageQueries imagequerystatements) >->
+        consumeResults) `onFailure` show)
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
