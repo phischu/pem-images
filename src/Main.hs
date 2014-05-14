@@ -31,6 +31,7 @@ import Text.Parsec.String (parseFromFile)
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
+import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
 
 testdirectory :: FilePath
 testdirectory = "data/small_dark_islands/"
@@ -51,13 +52,13 @@ differentThresholds = do
     threshold <- [0,8..255]
     [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
 
-consumeResults :: (MonadIO m) => Consumer ImageQueryResult m r
-consumeResults = go 1 where
+consumeResults :: (MonadIO m) => Handle -> Consumer ImageQueryResult m r
+consumeResults tablehandle = go 1 where
     go n = do
         imagequeryresult <- await
         liftIO (do
             saveIntermediateImages n (_outputImages imagequeryresult)
-            print (_tableRow imagequeryresult))
+            saveTableRow tablehandle (_tableRow imagequeryresult))
         go (n+1)
 
 saveIntermediateImages :: Int -> [Image Pixel8] -> IO [()]
@@ -66,6 +67,15 @@ saveIntermediateImages n outputimages = liftIO (forM (zip [0..] outputimages) (\
 
 intermediateImagePath :: Int -> Int -> FilePath
 intermediateImagePath i c = "result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp"
+
+saveTableRow :: Handle -> [Double] -> IO ()
+saveTableRow tablehandle tablerow = hPutStrLn tablehandle (csvRow tablerow)
+
+csvRow :: [Double] -> String
+csvRow = unwords . map show
+
+csvResultPath :: FilePath
+csvResultPath = "result" </> "table.csv"
 
 main :: IO ()
 main = runBatch "test.imagequery" >>= either putStrLn (const (putStrLn "success"))
@@ -82,10 +92,12 @@ runBatch queryfilename = runEitherT (do
     imagequerystatements <- hoistEither parseresult `onFailure` show
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
+    tablehandle <- scriptIO (openFile csvResultPath WriteMode)
     runEffect (
         imageSeries testdirectory >->
         Pipes.mapM (runImageQueries imagequerystatements) >->
-        consumeResults) `onFailure` show)
+        consumeResults tablehandle) `onFailure` show
+    scriptIO (hClose tablehandle))
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
