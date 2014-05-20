@@ -14,7 +14,7 @@ imageQueriesParser :: Parser [ImageQueryStatement]
 imageQueriesParser = imageQueryParser `sepEndBy` newline
 
 imageQueryParser :: Parser ImageQueryStatement
-imageQueryParser = choice [setPropertyParser,tableQuueryParser,outputParser]
+imageQueryParser = choice [setPropertyParser,tableQueryParser,outputParser]
 
 setPropertyParser :: Parser ImageQueryStatement
 setPropertyParser = choice (map try (map (fmap SetImageQueryParameter) [
@@ -27,8 +27,8 @@ thresholdParser = do
     thresholdstring <- digits
     return (Threshold (read thresholdstring))
 
-tableQuueryParser :: Parser ImageQueryStatement
-tableQuueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
+tableQueryParser :: Parser ImageQueryStatement
+tableQueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
     valueInPointParser]))
 
 valueInPointParser :: Parser TableQuery
