@@ -23,7 +23,10 @@ import Pipes (Consumer,runEffect,(>->),await)
 import qualified Pipes.Prelude as Pipes (mapM)
 
 import Data.Traversable (forM)
+import Control.Monad (forever)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
+import Control.Monad.Trans.State (StateT,evalStateT,get,put)
 
 import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
 
@@ -53,13 +56,14 @@ differentThresholds = do
     [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
 
 consumeResults :: (MonadIO m) => Handle -> Consumer ImageQueryResult m r
-consumeResults tablehandle = go 1 where
-    go n = do
-        imagequeryresult <- await
-        liftIO (do
-            saveIntermediateImages n (_outputImages imagequeryresult)
-            saveTableRow tablehandle (_tableRow imagequeryresult))
-        go (n+1)
+consumeResults tablehandle = flip evalStateT (0,Nothing) (forever (do
+    imagequeryresult <- lift await
+    (n,maybeaverageimage) <- get
+    let maybeaverageimage' = undefined
+    put (n+1,maybeaverageimage')
+    liftIO (do
+        saveIntermediateImages n (_outputImages imagequeryresult)
+        saveTableRow tablehandle (_tableRow imagequeryresult))))
 
 saveIntermediateImages :: Int -> [Image Pixel8] -> IO [()]
 saveIntermediateImages n outputimages = liftIO (forM (zip [0..] outputimages) (\(i,image) -> do
