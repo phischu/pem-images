@@ -3,8 +3,9 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQuery(TableQuery,IslandImage,ImageOfAverage),
+    ImageQuery(TableQuery,IslandImage,LineImage,ImageOfAverage),
     ImageQueryParameter(Threshold),
+    Orientation(Horizontal),
     TableQuery(..),
     IslandQuery(..),
     Polarity(Dark,Bright),
@@ -53,7 +54,8 @@ testqueries = [
     GetImageQueryResult (IslandImage Bright),
     GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12)),
-    GetImageQueryResult ImageOfAverage]
+    GetImageQueryResult ImageOfAverage,
+    GetImageQueryResult (LineImage Horizontal 5 6 300)]
 
 differentThresholds :: [ImageQueryStatement]
 differentThresholds = do
