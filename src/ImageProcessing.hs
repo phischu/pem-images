@@ -3,7 +3,7 @@ module ImageProcessing where
 
 import qualified Data.Array.Repa as Repa (
     Array,
-    sumAllS,map,traverse,delay,zipWith,backpermuteDft)
+    sumAllS,map,traverse,delay,zipWith,backpermuteDft,append)
 import Data.Array.Repa (
     D,DIM2,extent,
     Shape,inShape,(:.)((:.)),Z(Z),index,
@@ -125,16 +125,10 @@ verticalLine fromx fromy pixelsonline image =
             step = signum pixelsonline
             n = abs pixelsonline
 
+appendLine :: Image Word8 -> Vector Word8 -> Image Word8
+appendLine image line = Repa.append image (Repa.fromUnboxed (Z:.h:.1) line) where
+    (Z:.h:._) = extent image
 
-toLineImages :: [Boxed.Vector (Vector Word8)] -> Boxed.Vector (Image Word8)
-toLineImages = Boxed.fromList . map accumulateImage . transpose . map Boxed.toList
-
-accumulateImage :: [Vector Word8] -> Image Word8
-accumulateImage imagelines = Repa.delay (Repa.fromUnboxed (Z:.h:.w) (Vector.concat imagelines)) where
-    w = length imagelines
-    h = case imagelines of
-        [] -> 0
-        (imageline:_) -> Vector.length imageline
 
 addImage :: Maybe (Image Integer) -> Image Word8 -> Maybe (Image Integer)
 addImage Nothing image = Just (Repa.map fromIntegral image)
