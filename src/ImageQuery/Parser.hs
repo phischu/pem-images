@@ -3,9 +3,10 @@ module ImageQuery.Parser where
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
     ImageQueryParameter(Threshold),
-    ImageQuery(TableQuery,IslandImage),
+    ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage),
     TableQuery(ValueInPoint),
-    Polarity(Bright,Dark))
+    Polarity(Bright,Dark),
+    Orientation(Horizontal,Vertical))
 import Text.Parsec (
     sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>))
 import Text.Parsec.String (Parser)
@@ -42,7 +43,9 @@ valueInPointParser = do
 
 outputParser :: Parser ImageQueryStatement
 outputParser = choice (map try (map (fmap GetImageQueryResult) [
-    islandImagesParser]))
+    islandImagesParser,
+    averageImageParser,
+    lineImageParser]))
 
 islandImagesParser :: Parser ImageQuery
 islandImagesParser = do
@@ -50,6 +53,27 @@ islandImagesParser = do
     spaces
     polarity <- brightOrDarkParser
     return (IslandImage polarity)
+
+averageImageParser :: Parser ImageQuery
+averageImageParser = do
+    string "output_average_image"
+    return ImageOfAverage
+
+lineImageParser :: Parser ImageQuery
+lineImageParser = do
+    string "output_line_image"
+    spaces
+    orientation <- orientationParser
+    spaces
+    xstring <- digits
+    spaces
+    ystring <- digits
+    spaces
+    lstring <- digits
+    return (LineImage orientation (read xstring) (read ystring) (read lstring))
+
+orientationParser :: Parser Orientation
+orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vertical" >> return Vertical)
 
 brightOrDarkParser :: Parser Polarity
 brightOrDarkParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
