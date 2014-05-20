@@ -9,7 +9,10 @@ import ImageQuery (
     IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
-import ImageProcessing (Image,imageToJuicy,addImage,finalizeAverageImage)
+import ImageProcessing (
+    Image,imageToJuicy,
+    singleAverageImage,addImage,finalizeAverageImage,
+    singleLineImage,appendLine)
 import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (Pixel8,writeBitmap)
@@ -22,8 +25,7 @@ import Graphics.UI.WXCore (
 import Pipes (Consumer,runEffect,(>->),await)
 import qualified Pipes.Prelude as Pipes (mapM)
 
-import Data.Traversable (forM)
-import Control.Monad (forever)
+import Control.Monad (forever,forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (StateT,evalStateT,get,put)
@@ -59,25 +61,33 @@ differentThresholds = do
     [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
 
 consumeResults :: (MonadIO m) => Handle -> Consumer ImageQueryResult m r
-consumeResults tablehandle = flip evalStateT (0,Nothing) (forever (do
+consumeResults tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
 
     imagequeryresult <- lift await
+    (n,maybeaverageimage,maybelineimages) <- get
 
-    (n,maybeaverageimage) <- get
     let maybeaverageimage' = do
             image <- listToMaybe (_averageImages imagequeryresult)
-            addImage maybeaverageimage image
+            case maybeaverageimage of
+                Nothing -> Just (singleAverageImage image)
+                Just averageimage -> Just (addImage averageimage image)
         n' = n+1
-    put (n',maybeaverageimage')
+        imagelines = _imageLines imagequeryresult
+        maybelineimages' = case maybelineimages of
+            Nothing -> Just (map singleLineImage imagelines)
+            Just lineimages -> Just (zipWith appendLine lineimages imagelines)
+
+    put (n',maybeaverageimage',maybelineimages')
 
     liftIO (do
         saveIntermediateImages n (_outputImages imagequeryresult)
         saveTableRow tablehandle (_tableRow imagequeryresult)
-        saveAverageImage (finalizeAverageImage maybeaverageimage' n'))))
+        saveAverageImage (finalizeAverageImage maybeaverageimage' n')
+        maybe (return ()) saveLineImages maybelineimages')))
 
-saveIntermediateImages :: Int -> [Image Pixel8] -> IO [()]
-saveIntermediateImages n outputimages = liftIO (forM (zip [0..] outputimages) (\(i,image) -> do
-    writeBitmap (intermediateImagePath i n) (imageToJuicy image)))
+saveIntermediateImages :: Int -> [Image Pixel8] -> IO ()
+saveIntermediateImages n outputimages = forM_ (zip [0..] outputimages) (\(i,image) -> do
+    writeBitmap (intermediateImagePath i n) (imageToJuicy image))
 
 intermediateImagePath :: Int -> Int -> FilePath
 intermediateImagePath i c = "result" </> "intermediateimages" </> "thresholded-" ++ show i ++ "-" ++ show c ++ ".bmp"
@@ -95,7 +105,14 @@ saveAverageImage :: Maybe (Image Pixel8) -> IO ()
 saveAverageImage = maybe (return ()) (writeBitmap averageImagePath . imageToJuicy)
 
 averageImagePath :: FilePath
-averageImagePath = "result" </> "average-image.bmp"
+averageImagePath = "result" </> "averageimage.bmp"
+
+saveLineImages :: [Image Pixel8] -> IO ()
+saveLineImages lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
+    writeBitmap (lineImagePath i) (imageToJuicy lineimage))
+
+lineImagePath :: Int -> FilePath
+lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
 main :: IO ()
 main = runEitherT (runBatch testqueries) >>= either putStrLn (const (putStrLn "success"))

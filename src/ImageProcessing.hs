@@ -125,20 +125,28 @@ verticalLine fromx fromy pixelsonline image =
             step = signum pixelsonline
             n = abs pixelsonline
 
+
+singleLineImage :: Vector Word8 -> Image Word8
+singleLineImage line = Repa.delay (Repa.fromUnboxed (Z:.h:.1) line)where
+    h = Vector.length line
+
 appendLine :: Image Word8 -> Vector Word8 -> Image Word8
 appendLine image line = Repa.append image (Repa.fromUnboxed (Z:.h:.1) line) where
     (Z:.h:._) = extent image
 
 
-addImage :: Maybe (Image Integer) -> Image Word8 -> Maybe (Image Integer)
-addImage Nothing image = Just (Repa.map fromIntegral image)
-addImage (Just accuImage) image = Just (accuImage +^ (Repa.map fromIntegral image))
+singleAverageImage :: Image Word8 -> Image Integer
+singleAverageImage image = Repa.map fromIntegral image
+
+addImage :: Image Integer -> Image Word8 -> Image Integer
+addImage accuImage image = accuImage +^ (Repa.map fromIntegral image)
 
 finalizeAverageImage :: (Maybe (Image Integer)) -> Int -> Maybe (Image Word8)
 finalizeAverageImage Nothing _ = Nothing
 finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
+
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do
