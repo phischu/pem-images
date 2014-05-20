@@ -2,15 +2,16 @@ module ImageQuery.Parser where
 
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQueryParameter(Threshold),
+    ImageQueryParameter(Threshold,Channel,Smoothing,SubRect,StencilImage),
     ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
     Orientation(Horizontal,Vertical))
 import Text.Parsec (
-    sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>))
+    sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>),manyTill,anyChar)
 import Text.Parsec.String (Parser)
+import Control.Monad (replicateM)
 
 imageQueriesParser :: Parser [ImageQueryStatement]
 imageQueriesParser = imageQueryParser `sepEndBy` newline
@@ -20,7 +21,11 @@ imageQueryParser = choice [setPropertyParser,tableQueryParser,outputParser]
 
 setPropertyParser :: Parser ImageQueryStatement
 setPropertyParser = choice (map try (map (fmap SetImageQueryParameter) [
-    thresholdParser]))
+    thresholdParser,
+    channelParser,
+    smoothingParser,
+    subrectParser,
+    stencilParser]))
 
 thresholdParser :: Parser ImageQueryParameter
 thresholdParser = do
@@ -28,6 +33,36 @@ thresholdParser = do
     spaces
     thresholdstring <- digits
     return (Threshold (read thresholdstring))
+
+channelParser :: Parser ImageQueryParameter
+channelParser = do
+    string "set_channel"
+    spaces
+    channelstring <- digits
+    return (Channel (read channelstring))
+
+smoothingParser :: Parser ImageQueryParameter
+smoothingParser = do
+    string "set_smoothing"
+    spaces
+    smoothingstring <- digits
+    return (Smoothing (read smoothingstring))
+
+subrectParser :: Parser ImageQueryParameter
+subrectParser = do
+    string "set_subrect"
+    [x,y,w,h] <- replicateM 4 (do
+        spaces
+        numberstring <- digits
+        return (read numberstring))
+    return (SubRect (x,y,w,h))
+
+stencilParser :: Parser ImageQueryParameter
+stencilParser = do
+    string "set_stencil"
+    spaces
+    stencilFilePath <- manyTill anyChar newline
+    return (StencilImage undefined)
 
 tableQueryParser :: Parser ImageQueryStatement
 tableQueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
