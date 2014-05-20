@@ -78,7 +78,7 @@ csvResultPath :: FilePath
 csvResultPath = "result" </> "table.csv"
 
 main :: IO ()
-main = runBatch "test.imagequery" >>= either putStrLn (const (putStrLn "success"))
+main = runEitherT (runBatch testqueries) >>= either putStrLn (const (putStrLn "success"))
 
 gui :: IO ()
 gui = start (do
@@ -86,10 +86,14 @@ gui = start (do
     windowShow f
     return ())
 
-runBatch :: FilePath -> IO (Either String ())
-runBatch queryfilename = runEitherT (do
+run :: FilePath -> EitherT String IO ()
+run queryfilename = do
     parseresult <- scriptIO (parseFromFile imageQueriesParser queryfilename)
     imagequerystatements <- hoistEither parseresult `onFailure` show
+    runBatch imagequerystatements
+
+runBatch :: [ImageQueryStatement] -> EitherT String IO ()
+runBatch imagequerystatements = do
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
     tablehandle <- scriptIO (openFile csvResultPath WriteMode)
@@ -97,7 +101,7 @@ runBatch queryfilename = runEitherT (do
         imageSeries testdirectory >->
         Pipes.mapM (runImageQueries imagequerystatements) >->
         consumeResults tablehandle) `onFailure` show
-    scriptIO (hClose tablehandle))
+    scriptIO (hClose tablehandle)
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
