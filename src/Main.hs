@@ -31,13 +31,14 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (StateT,evalStateT,get,put)
 
-import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT)
+import Control.Error (EitherT,runEitherT,scriptIO,hoistEither,fmapLT,left)
 
 import Text.Parsec.String (parseFromFile)
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
+import System.Environment (getArgs)
 
 import Data.Maybe (listToMaybe)
 
@@ -117,7 +118,14 @@ lineImagePath :: Int -> FilePath
 lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
 main :: IO ()
-main = runEitherT (runBatch testqueries) >>= either putStrLn (const (putStrLn "success"))
+main = runEitherT (do
+    args <- scriptIO getArgs
+    case args of
+        [imagequeryfilename,inputdirectory] -> do
+            parseresult <- scriptIO (parseFromFile imageQueriesParser imagequeryfilename)
+            imagequerystatements <- hoistEither parseresult `onFailure` show
+            runBatch inputdirectory imagequerystatements
+        _ -> left "usage: pem-images myquery.imagequery path/to/images") >>= print
 
 gui :: IO ()
 gui = start (do
@@ -125,19 +133,13 @@ gui = start (do
     windowShow f
     return ())
 
-run :: FilePath -> EitherT String IO ()
-run queryfilename = do
-    parseresult <- scriptIO (parseFromFile imageQueriesParser queryfilename)
-    imagequerystatements <- hoistEither parseresult `onFailure` show
-    runBatch imagequerystatements
-
-runBatch :: [ImageQueryStatement] -> EitherT String IO ()
-runBatch imagequerystatements = do
+runBatch :: FilePath -> [ImageQueryStatement] -> EitherT String IO ()
+runBatch inputdirectory imagequerystatements = do
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
     tablehandle <- scriptIO (openFile csvResultPath WriteMode)
     runEffect (
-        imageSeries testdirectory >->
+        imageSeries inputdirectory >->
         Pipes.mapM (runImageQueries imagequerystatements) >->
         consumeResults tablehandle) `onFailure` show
     scriptIO (hClose tablehandle)
