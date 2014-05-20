@@ -9,7 +9,7 @@ import ImageQuery (
     IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
-import ImageProcessing (Image,imageToJuicy,addImage)
+import ImageProcessing (Image,imageToJuicy,addImage,finalizeAverageImage)
 import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (Pixel8,writeBitmap)
@@ -59,15 +59,20 @@ differentThresholds = do
 
 consumeResults :: (MonadIO m) => Handle -> Consumer ImageQueryResult m r
 consumeResults tablehandle = flip evalStateT (0,Nothing) (forever (do
+
     imagequeryresult <- lift await
+
     (n,maybeaverageimage) <- get
     let maybeaverageimage' = do
             image <- listToMaybe (_averageImages imagequeryresult)
             addImage maybeaverageimage image
-    put (n+1,maybeaverageimage')
+        n' = n+1
+    put (n',maybeaverageimage')
+
     liftIO (do
         saveIntermediateImages n (_outputImages imagequeryresult)
-        saveTableRow tablehandle (_tableRow imagequeryresult))))
+        saveTableRow tablehandle (_tableRow imagequeryresult)
+        saveAverageImage (finalizeAverageImage maybeaverageimage' n'))))
 
 saveIntermediateImages :: Int -> [Image Pixel8] -> IO [()]
 saveIntermediateImages n outputimages = liftIO (forM (zip [0..] outputimages) (\(i,image) -> do
@@ -84,6 +89,12 @@ csvRow = unwords . map show
 
 csvResultPath :: FilePath
 csvResultPath = "result" </> "table.csv"
+
+saveAverageImage :: Maybe (Image Pixel8) -> IO ()
+saveAverageImage = maybe (return ()) (writeBitmap averageImagePath . imageToJuicy)
+
+averageImagePath :: FilePath
+averageImagePath = "result" </> "average-image.bmp"
 
 main :: IO ()
 main = runEitherT (runBatch testqueries) >>= either putStrLn (const (putStrLn "success"))
