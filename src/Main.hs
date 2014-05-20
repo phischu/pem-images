@@ -3,7 +3,7 @@ module Main where
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQuery(TableQuery,IslandImage),
+    ImageQuery(TableQuery,IslandImage,ImageOfAverage),
     ImageQueryParameter(Threshold),
     TableQuery(..),
     IslandQuery(..),
@@ -50,7 +50,8 @@ testqueries = [
     SetImageQueryParameter (Threshold 251),
     GetImageQueryResult (IslandImage Bright),
     GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
-    GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12))]
+    GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12)),
+    GetImageQueryResult ImageOfAverage]
 
 differentThresholds :: [ImageQueryStatement]
 differentThresholds = do
