@@ -4,7 +4,8 @@ import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
     ImageQueryParameter(Threshold),
     ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage),
-    TableQuery(ValueInPoint),
+    TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
+    IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
     Orientation(Horizontal,Vertical))
 import Text.Parsec (
@@ -30,7 +31,12 @@ thresholdParser = do
 
 tableQueryParser :: Parser ImageQueryStatement
 tableQueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
-    valueInPointParser]))
+    valueInPointParser,
+    averageAroundPointParser,
+    averageOfImageParser,
+    numberOfIslandsParser,
+    averageAreaOfIslandsParser,
+    averageOutlineOfIslandsParser]))
 
 valueInPointParser :: Parser TableQuery
 valueInPointParser = do
@@ -40,6 +46,43 @@ valueInPointParser = do
     spaces
     ystring <- digits
     return (ValueInPoint (read xstring) (read ystring))
+
+averageAroundPointParser :: Parser TableQuery
+averageAroundPointParser = do
+    string "table_average_around_point"
+    spaces
+    xstring <- digits
+    spaces
+    ystring <- digits
+    spaces
+    rstring <- digits
+    return (AverageAroundPoint (read xstring) (read ystring) (read rstring))
+
+averageOfImageParser :: Parser TableQuery
+averageOfImageParser = do
+    string "table_average_of_image"
+    return AverageOfImage
+
+numberOfIslandsParser :: Parser TableQuery
+numberOfIslandsParser = do
+    string "table_number_of_islands"
+    spaces
+    polarity <- polarityParser
+    return (IslandQuery polarity NumberOfIslands)
+
+averageAreaOfIslandsParser :: Parser TableQuery
+averageAreaOfIslandsParser = do
+    string "table_average_area_of_islands"
+    spaces
+    polarity <- polarityParser
+    return (IslandQuery polarity AverageAreaOfIslands)
+
+averageOutlineOfIslandsParser :: Parser TableQuery
+averageOutlineOfIslandsParser = do
+    string "table_average_outline_of_islands"
+    spaces
+    polarity <- polarityParser
+    return (IslandQuery polarity AverageOutlineOfIslands)
 
 outputParser :: Parser ImageQueryStatement
 outputParser = choice (map try (map (fmap GetImageQueryResult) [
@@ -51,7 +94,7 @@ islandImagesParser :: Parser ImageQuery
 islandImagesParser = do
     string "output_island_images"
     spaces
-    polarity <- brightOrDarkParser
+    polarity <- polarityParser
     return (IslandImage polarity)
 
 averageImageParser :: Parser ImageQuery
@@ -75,8 +118,8 @@ lineImageParser = do
 orientationParser :: Parser Orientation
 orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vertical" >> return Vertical)
 
-brightOrDarkParser :: Parser Polarity
-brightOrDarkParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
+polarityParser :: Parser Polarity
+polarityParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
 
 printImageQueries :: [ImageQueryStatement] -> String
 printImageQueries = undefined
