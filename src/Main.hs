@@ -9,7 +9,7 @@ import ImageQuery (
     IslandQuery(..),
     Polarity(Dark,Bright),
     runImageQueries,ImageQueryResult(..))
-import ImageProcessing (Image,imageToJuicy)
+import ImageProcessing (Image,imageToJuicy,addImage)
 import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (Pixel8,writeBitmap)
@@ -36,6 +36,8 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
 
+import Data.Maybe (listToMaybe)
+
 testdirectory :: FilePath
 testdirectory = "data/small_dark_islands/"
 
@@ -59,7 +61,9 @@ consumeResults :: (MonadIO m) => Handle -> Consumer ImageQueryResult m r
 consumeResults tablehandle = flip evalStateT (0,Nothing) (forever (do
     imagequeryresult <- lift await
     (n,maybeaverageimage) <- get
-    let maybeaverageimage' = undefined
+    let maybeaverageimage' = do
+            image <- listToMaybe (_averageImages imagequeryresult)
+            addImage maybeaverageimage image
     put (n+1,maybeaverageimage')
     liftIO (do
         saveIntermediateImages n (_outputImages imagequeryresult)
