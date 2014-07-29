@@ -1,8 +1,12 @@
 module GUI where
 
+import ImageQuery (ImageQueryStatement)
+
 import Graphics.UI.WX (
     start,close,
-    frame,button,singleListBox,
+    frame,Frame,
+    button,Button,
+    fileSaveDialog,
     Prop((:=)),set,text,items,
     on,command,
     layout,widget,row)
@@ -10,31 +14,52 @@ import Graphics.UI.WX (
 import MVC (
     runMVC,Model,View,Controller,asPipe,
     Managed,managed,asSink,asInput,
-    spawn,Buffer(Single),atomically,send,recv,forkIO)
+    spawn,Buffer(Single),atomically,forkIO,
+    Output,send,recv,)
 import Pipes (await,yield)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.State.Strict (get,modify)
+import Control.Monad.State.Class (get)
 
-import Control.Monad (forever)
+import Control.Monad (forever,void)
 
-model :: Model [String] () [String]
+data Program =
+    Program [ImageQueryStatement] |
+    Error String
+
+data Request =
+    RequestSaveProgram FilePath
+
+data Response =
+    ResponseSaveProgram FilePath [ImageQueryStatement]
+
+gui :: IO ()
+gui = runMVC (Program []) model wx >> return ()
+
+model :: Model Program Request Response
 model = asPipe (forever (do
-    () <- await
-    lift (modify (\xs -> "hallo" : xs))
-    lift get >>= yield))
+    RequestSaveProgram filepath <- await
+    Program imagequerystatements <- get
+    yield (ResponseSaveProgram filepath imagequerystatements)))
 
-wx :: Managed (View [String],Controller ())
+wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
-    (buttonOutput,buttonInput) <- spawn Single
+    (saveProgramO,saveProgramI) <- spawn Single
     (listOutput,listInput) <- spawn Single
     forkIO (start (do
         parentFrame <- frame [text := "Image Processing"]
-        but <- button parentFrame [text := "GO!", on command := atomically (send buttonOutput ()) >> return ()]
-        lst <- singleListBox parentFrame [items := ["world"]]
-        forkIO (forever (atomically (recv listInput) >>= maybe (return ()) (\xs -> set lst [items := xs])))
-        set parentFrame [layout := row 5 [widget lst,widget but]]))
-    let updateList xs = atomically (send listOutput xs) >> return ()
-    k (asSink updateList,asInput buttonInput))
+        saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
+        set parentFrame [layout := row 5 [widget saveProgramButton]]))
+    let updateList _ = return ()
+    k (asSink updateList,asInput saveProgramI))
 
-gui :: IO ()
-gui = runMVC [] model wx >> return ()
+createSaveProgramButton :: Frame () -> Output Request -> IO (Button ())
+createSaveProgramButton parentFrame saveProgramO = button parentFrame attributes where
+    attributes = [text := "Save", on command := sendSaveProgramRequest]
+    sendSaveProgramRequest = do
+        maybeFilepath <- fileSaveDialog
+            parentFrame True True "Save Image Queries"
+            [("Image Query File",["*.imagequery"])] "" ""
+        case maybeFilepath of
+            Nothing -> return ()
+            Just filepath -> do
+                atomically (send saveProgramO (RequestSaveProgram filepath))
+                return ()
