@@ -1,5 +1,6 @@
 module Main where
 
+import GUI (gui)
 import ImageLoading (imageSeries)
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
@@ -17,11 +18,6 @@ import ImageProcessing (
 import ImageQuery.Parser (imageQueriesParser)
 
 import Codec.Picture (Pixel8,writeBitmap)
-
-import Graphics.UI.WX (
-    start,frameLoadRes)
-import Graphics.UI.WXCore (
-    windowShow)
 
 import Pipes (Consumer,runEffect,(>->),await)
 import qualified Pipes.Prelude as Pipes (mapM)
@@ -129,12 +125,6 @@ cli = runEitherT (do
             imagequerystatements <- hoistEither parseresult `onFailure` show
             runBatch inputdirectory imagequerystatements
         _ -> left "usage: pem-images myquery.imagequery path/to/images") >>= print
-
-gui :: IO ()
-gui = start (do
-    f <- frameLoadRes "GUI.xrc" "MainFrame" []
-    windowShow f
-    return ())
 
 runBatch :: FilePath -> [ImageQueryStatement] -> EitherT String IO ()
 runBatch inputdirectory imagequerystatements = do

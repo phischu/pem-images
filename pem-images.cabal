@@ -20,7 +20,8 @@ executable pem-images
   other-modules:       ImageQuery,
                        ImageLoading,
                        ImageProcessing,
-                       ImageQuery.Parser
+                       ImageQuery.Parser,
+                       GUI
   -- other-extensions:    
   build-depends:       base >=4.6 && <4.7,
                        transformers >= 0.3.0.0 && < 0.4,
