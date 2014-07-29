@@ -2,6 +2,7 @@ module GUI where
 
 import ImageQuery (ImageQueryStatement)
 import ImageQuery.Parser (imageQueriesParser)
+import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
 
 import Graphics.UI.WX (
@@ -70,7 +71,8 @@ wx = managed (\k -> do
         set parentFrame [layout := frameLayout]))
 
     let inputs = [saveProgramI,loadProgramI]
-        sink (ResponseSaveProgram filepath imagequerystatements) = print "Shoudl save"
+        sink (ResponseSaveProgram filepath imagequerystatements) = do
+            writeFile filepath (imageQueriesPrinter imagequerystatements)
         sink (ResponseProgramChanged imagequerystatements) = do
             atomically (send programChangedO imagequerystatements)
             return ()
@@ -115,5 +117,5 @@ createProgramListBox parentFrame programChangedI = do
         case maybeImageQueryStatements of
             Nothing -> return ()
             Just imagequerystatements -> do
-                set programListBox [items := ["Hello","World"]]))
+                set programListBox [items := map imageQueryStatementPrinter imagequerystatements]))
     return programListBox

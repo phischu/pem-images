@@ -21,6 +21,7 @@ executable pem-images
                        ImageLoading,
                        ImageProcessing,
                        ImageQuery.Parser,
+                       ImageQuery.Printer,
                        GUI
   -- other-extensions:    
   build-depends:       base >=4.6 && <4.7,

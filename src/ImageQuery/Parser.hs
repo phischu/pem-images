@@ -156,8 +156,5 @@ orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vert
 polarityParser :: Parser Polarity
 polarityParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
 
-printImageQueries :: [ImageQueryStatement] -> String
-printImageQueries = undefined
-
 digits :: Parser String
 digits = many1 digit
