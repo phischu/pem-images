@@ -10,9 +10,9 @@ import Graphics.UI.WX (
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
     fileSaveDialog,fileOpenDialog,errorDialog,
-    Prop((:=)),set,text,items,
+    Prop((:=)),set,text,items,sz,position,pt,
     on,command,
-    layout,widget,row,column)
+    layout,widget,row,column,minsize)
 
 import MVC (
     runMVC,Model,View,Controller,asPipe,
@@ -59,12 +59,12 @@ wx = managed (\k -> do
     (programChangedO,programChangedI) <- spawn Single
 
     forkIO (start (do
-        parentFrame <- frame [text := "Image Processing"]
+        parentFrame <- frame [text := "Image Processing",position := pt 100 100]
         saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
         loadProgramButton <- createLoadProgramButton parentFrame loadProgramO
         programListBox <- createProgramListBox parentFrame programChangedI
         let frameLayout = column 5 [
-                widget programListBox,
+                minsize (sz 500 500) (widget programListBox),
                 row 5 [
                     widget loadProgramButton,
                     widget saveProgramButton]]

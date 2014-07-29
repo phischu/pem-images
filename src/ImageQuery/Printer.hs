@@ -31,7 +31,7 @@ imageQueryPrinter :: Printer ImageQuery
 imageQueryPrinter (TableQuery tablequery) = tableQueryPrinter tablequery
 imageQueryPrinter ImageOfAverage = "output_average_image"
 imageQueryPrinter (LineImage orientation x y l) =
-    "output_line_image " ++ orientationPrinter orientation ++ numbersPrinter [x,y,l]
+    "output_line_image " ++ orientationPrinter orientation ++ " " ++ numbersPrinter [x,y,l]
 imageQueryPrinter (IslandImage polarity) = "output_island_images " ++ polarityPrinter polarity
 
 tableQueryPrinter :: Printer TableQuery
