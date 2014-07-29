@@ -103,7 +103,7 @@ numberOfTruePixels image = Repa.sumAllS (Repa.map boolToDouble image) where
 
 numberOfOutlinePixels :: Image Bool -> Double
 numberOfOutlinePixels image = numberOfTruePixels (Repa.traverse image id isOutline) where
-    isOutline i (Z:.y:.x) = not (all (withDefault (extent image) False i) neighbours) where
+    isOutline i (Z:.y:.x) = i (Z:.y:.x) && not (all (withDefault (extent image) False i) neighbours) where
         neighbours = [Z:.y:.x-1,Z:.y:.x+1,Z:.y-1:.x,Z:.y+1:.x]
 
 withDefault :: (Shape sh) => sh -> a -> (sh -> a) -> sh -> a
