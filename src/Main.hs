@@ -118,7 +118,10 @@ lineImagePath :: Int -> FilePath
 lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
 main :: IO ()
-main = runEitherT (do
+main = gui
+
+cli :: IO ()
+cli = runEitherT (do
     args <- scriptIO getArgs
     case args of
         [imagequeryfilename,inputdirectory] -> do
