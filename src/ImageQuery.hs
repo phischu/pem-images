@@ -30,7 +30,7 @@ data ImageQuery =
 data ImageQueryParameter =
     Channel Int |
     SubRect Rect |
-    StencilImage (Image Bool) |
+    StencilImage FilePath (Maybe (Image Bool)) |
     Threshold Threshold |
     Smoothing Int
 
@@ -109,7 +109,7 @@ setImageQueryParameter (Channel channel) =
     modify (\imagequeryparameters -> imagequeryparameters {_channel = channel})
 setImageQueryParameter (SubRect (a1,a2,b1,b2)) =
     modify (\imagequeryparameters -> imagequeryparameters {_subRect = Just (a1,a2,b1,b2)})
-setImageQueryParameter (StencilImage stencilimage) =
+setImageQueryParameter (StencilImage _ (Just stencilimage)) =
     modify (\imagequeryparameters -> imagequeryparameters {_stencilImage = Just stencilimage})
 setImageQueryParameter (Threshold threshold) =
     modify (\imagequeryparameters -> imagequeryparameters {_threshold = threshold})

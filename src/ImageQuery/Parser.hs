@@ -62,7 +62,7 @@ stencilParser = do
     string "set_stencil"
     spaces
     stencilFilePath <- manyTill anyChar newline
-    return (StencilImage undefined)
+    return (StencilImage stencilFilePath Nothing)
 
 tableQueryParser :: Parser ImageQueryStatement
 tableQueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
