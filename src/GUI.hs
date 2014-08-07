@@ -7,7 +7,7 @@ import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
 
 import Graphics.UI.WX (
-    start,close,
+    start,
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
     fileSaveDialog,fileOpenDialog,errorDialog,

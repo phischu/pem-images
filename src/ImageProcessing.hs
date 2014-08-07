@@ -32,11 +32,9 @@ import qualified Data.UnionFind.ST as UnionFind (
 
 import Control.Monad (when)
 import Data.Traversable (forM)
-import Data.List (transpose)
 
 import Data.Vector.Unboxed (Vector)
-import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length,concat)
-import qualified Data.Vector as Boxed (Vector,toList,fromList)
+import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length)
 
 type Image a = Repa.Array D DIM2 a
 type Rect = (Int,Int,Int,Int)
