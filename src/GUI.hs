@@ -31,11 +31,13 @@ data Program =
 
 data Request =
     RequestSaveProgram FilePath |
-    RequestLoadProgram [ImageQueryStatement]
+    RequestLoadProgram [ImageQueryStatement] |
+    RequestRunProgram
 
 data Response =
     ResponseSaveProgram FilePath [ImageQueryStatement] |
-    ResponseProgramChanged [ImageQueryStatement]
+    ResponseProgramChanged [ImageQueryStatement] |
+    ResponseRunProgram [ImageQueryStatement]
 
 gui :: IO ()
 gui = runMVC (Program []) model wx >> return ()
@@ -49,32 +51,44 @@ model = asPipe (forever (do
             yield (ResponseSaveProgram filepath imagequerystatements)
         RequestLoadProgram imagequerystatements -> do
             put (Program imagequerystatements)
-            yield (ResponseProgramChanged imagequerystatements)))
+            yield (ResponseProgramChanged imagequerystatements)
+        RequestRunProgram -> do
+            Program imagequerystatements <- get
+            yield (ResponseRunProgram imagequerystatements)))
 
 wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
 
-    (saveProgramO,saveProgramI) <- spawn Single
-    (loadProgramO,loadProgramI) <- spawn Single
+    (saveProgramO,saveProgramI)       <- spawn Single
+    (loadProgramO,loadProgramI)       <- spawn Single
+    (runProgramO,runProgramI)         <- spawn Single
     (programChangedO,programChangedI) <- spawn Single
 
     forkIO (start (do
-        parentFrame <- frame [text := "Image Processing",position := pt 100 100]
+
+        parentFrame       <- frame [text := "Image Processing",position := pt 100 100]
         saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
         loadProgramButton <- createLoadProgramButton parentFrame loadProgramO
-        programListBox <- createProgramListBox parentFrame programChangedI
+        runProgramButton  <- createRunProgramButton parentFrame runProgramO
+        programListBox    <- createProgramListBox parentFrame programChangedI
+
         let frameLayout = column 5 [
                 minsize (sz 500 500) (widget programListBox),
                 row 5 [
                     widget loadProgramButton,
-                    widget saveProgramButton]]
+                    widget saveProgramButton,
+                    widget runProgramButton]]
+
         set parentFrame [layout := frameLayout]))
 
-    let inputs = [saveProgramI,loadProgramI]
+    let inputs = [saveProgramI,loadProgramI,runProgramI]
         sink (ResponseSaveProgram filepath imagequerystatements) = do
             writeFile filepath (imageQueriesPrinter imagequerystatements)
         sink (ResponseProgramChanged imagequerystatements) = do
             atomically (send programChangedO imagequerystatements)
+            return ()
+        sink (ResponseRunProgram imagequerystatements) = do
+            print "run"
             return ()
 
     k (asSink sink,asInput (mconcat inputs)))
@@ -119,3 +133,10 @@ createProgramListBox parentFrame programChangedI = do
             Just imagequerystatements -> do
                 set programListBox [items := map imageQueryStatementPrinter imagequerystatements]))
     return programListBox
+
+createRunProgramButton :: Frame () -> Output Request -> IO (Button ())
+createRunProgramButton parentFrame runProgramO = button parentFrame attributes where
+    attributes = [text := "Run", on command := sendRunProgramRequest]
+    sendRunProgramRequest = do
+        atomically (send runProgramO RequestRunProgram)
+        return ()
