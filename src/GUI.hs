@@ -1,5 +1,6 @@
 module GUI where
 
+import Run (run)
 import ImageQuery (ImageQueryStatement)
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
@@ -88,8 +89,8 @@ wx = managed (\k -> do
             atomically (send programChangedO imagequerystatements)
             return ()
         sink (ResponseRunProgram imagequerystatements) = do
-            print "run"
-            return ()
+            result <- run "data/Einbettung" imagequerystatements
+            print (either id (const "Run finished!") result)
 
     k (asSink sink,asInput (mconcat inputs)))
 
