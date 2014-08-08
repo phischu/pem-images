@@ -15,8 +15,9 @@ import Graphics.UI.WX (
     fileSaveDialog,fileOpenDialog,errorDialog,
     Prop((:=)),set,text,items,sz,position,pt,selection,
     on,command,
-    layout,widget,row,column,minsize)
-import qualified  Graphics.UI.WX as Wx (get)
+    layout,widget,row,column,minsize,
+    panel,Panel)
+import qualified  Graphics.UI.WX as Wx (get,set)
 
 import MVC (
     runMVC,Model,View,Controller,asPipe,
@@ -78,12 +79,12 @@ wx = managed (\k -> do
 
     forkIO (start (do
 
-        parentFrame         <- frame [text := "Image Processing",position := pt 100 100]
-        saveProgramButton   <- createSaveProgramButton parentFrame saveProgramO
-        loadProgramButton   <- createLoadProgramButton parentFrame loadProgramO
-        runProgramButton    <- createRunProgramButton parentFrame runProgramO
-        programListBox      <- createProgramListBox parentFrame programChangedI
-        addStatementControl <- createAddStatementControl programListBox parentFrame addStatementO
+        parentFrame       <- frame [text := "Image Processing",position := pt 100 100]
+        saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
+        loadProgramButton <- createLoadProgramButton parentFrame loadProgramO
+        runProgramButton  <- createRunProgramButton parentFrame runProgramO
+        programListBox    <- createProgramListBox parentFrame programChangedI
+        addStatementPanel <- createAddStatementPanel programListBox parentFrame addStatementO
 
         let frameLayout = row 5 [
                 column 5 [
@@ -92,7 +93,7 @@ wx = managed (\k -> do
                         widget loadProgramButton,
                         widget saveProgramButton,
                         widget runProgramButton]],
-                widget addStatementControl]
+                widget addStatementPanel]
 
         set parentFrame [layout := frameLayout]))
 
@@ -162,8 +163,16 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
         atomically (send runProgramO RequestRunProgram)
         return ()
 
-createAddStatementControl :: SingleListBox () -> Frame () -> Output Request -> IO (Button ())
-createAddStatementControl programListBox parentFrame addStatementO = button parentFrame attributes where
+createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
+createAddStatementPanel programListBox parentFrame addStatementO = do
+    addStatementPanel  <- panel parentFrame []
+    averageImageButton <- createAverageImageButton programListBox addStatementPanel addStatementO
+    Wx.set addStatementPanel [layout := column 5 [
+        widget averageImageButton]]
+    return addStatementPanel
+
+createAverageImageButton :: SingleListBox () -> Panel () -> Output Request -> IO (Button ())
+createAverageImageButton programListBox addStatementPanel addStatementO = button addStatementPanel attributes where
     attributes = [text := "AverageImage", on command := sendAverageImageRequest]
     sendAverageImageRequest = do
         index <- Wx.get programListBox selection
