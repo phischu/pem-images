@@ -3,7 +3,8 @@ module GUI where
 import Run (run)
 import ImageQuery (
     ImageQueryStatement(GetImageQueryResult),
-    ImageQuery(ImageOfAverage))
+    ImageQuery(ImageOfAverage,IslandImage),
+    Polarity(Dark,Bright))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -16,7 +17,8 @@ import Graphics.UI.WX (
     Prop((:=)),set,text,items,sz,position,pt,selection,
     on,command,
     layout,widget,row,column,minsize,
-    panel,Panel)
+    panel,Panel,
+    choice)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
 import MVC (
@@ -143,7 +145,7 @@ createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes
 createProgramListBox :: Frame () -> Input [ImageQueryStatement] -> IO (SingleListBox ())
 createProgramListBox parentFrame programChangedI = do
     programListBox <- singleListBox parentFrame [
-        items := ["new statement"],
+        items := ["NEW STATEMENT"],
         selection := 0]
     forkIO (forever (do
         maybeImageQueryStatements <- atomically (recv programChangedI)
@@ -152,7 +154,7 @@ createProgramListBox parentFrame programChangedI = do
             Just imagequerystatements -> do
                 index <- Wx.get programListBox selection
                 set programListBox [
-                    items := map imageQueryStatementPrinter imagequerystatements ++ ["new statement"],
+                    items := map imageQueryStatementPrinter imagequerystatements ++ ["NEW STATEMENT"],
                     selection := index + 1]))
     return programListBox
 
@@ -167,8 +169,10 @@ createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO 
 createAddStatementPanel programListBox parentFrame addStatementO = do
     addStatementPanel  <- panel parentFrame []
     averageImageButton <- createAverageImageButton programListBox addStatementPanel addStatementO
+    islandImagePanel   <- createIslandImagePanel programListBox addStatementPanel addStatementO
     Wx.set addStatementPanel [layout := column 5 [
-        widget averageImageButton]]
+        widget averageImageButton,
+        widget islandImagePanel]]
     return addStatementPanel
 
 createAverageImageButton :: SingleListBox () -> Panel () -> Output Request -> IO (Button ())
@@ -179,3 +183,23 @@ createAverageImageButton programListBox addStatementPanel addStatementO = button
         atomically (send addStatementO (RequestAddStatement index (GetImageQueryResult ImageOfAverage)))
         return ()
 
+createIslandImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
+createIslandImagePanel programListBox addStatementPanel addStatementO = do
+
+    islandImagePanel <- panel addStatementPanel []
+
+    polarityChoice <- choice islandImagePanel [items := ["dark","bright"],selection := 0]
+
+    let sendIslandImageRequest = do
+
+            index <- Wx.get programListBox selection
+            polaritySelection <- Wx.get polarityChoice selection
+            let polarity = if polaritySelection == 0 then Dark else Bright
+
+            atomically (send addStatementO (RequestAddStatement index (GetImageQueryResult (IslandImage polarity))))
+            return ()
+    islandImageButton <- button islandImagePanel [text := "IslandImage", on command := sendIslandImageRequest]
+    
+    Wx.set islandImagePanel [layout := row 5 [widget islandImageButton,widget polarityChoice]]
+
+    return islandImagePanel
