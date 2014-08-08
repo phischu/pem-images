@@ -15,11 +15,10 @@ import Graphics.UI.WX (
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
     fileSaveDialog,fileOpenDialog,errorDialog,
-    Prop((:=)),set,text,items,sz,position,pt,selection,
+    Prop((:=)),set,text,items,sz,position,pt,selection,text,
     on,command,
     layout,widget,row,column,minsize,
-    panel,Panel,
-    choice)
+    panel,Panel,choice,entry)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
 import MVC (
@@ -204,16 +203,23 @@ createLineImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Pa
 createLineImagePanel programListBox addStatementPanel addStatementO = do
     lineImagePanel <- panel addStatementPanel []
     orientationChoice <- choice lineImagePanel [items := ["horizontal","vertical"],selection := 0]
+    xEntry <- entry lineImagePanel [text := "0"]
+    yEntry <- entry lineImagePanel [text := "0"]
+    lEntry <- entry lineImagePanel [text := "0"]
     let sendLineImageRequest = do
             index <- Wx.get programListBox selection
             orientationSelection <- Wx.get orientationChoice selection
+            xText <- Wx.get xEntry text
+            yText <- Wx.get yEntry text
+            lText <- Wx.get lEntry text
             let orientation = if orientationSelection == 0 then Horizontal else Vertical
-                x = undefined
-                y = undefined
-                l = undefined
+                x = read xText
+                y = read yText
+                l = read lText
                 imagequery = GetImageQueryResult (LineImage orientation x y l)
             atomically (send addStatementO (RequestAddStatement index imagequery))
             return ()
     lineImageButton <- button lineImagePanel [text := "LineImage", on command := sendLineImageRequest]
-    Wx.set lineImagePanel [layout := row 5 [widget lineImageButton,widget orientationChoice]]
+    Wx.set lineImagePanel [layout := row 5 [
+        widget lineImageButton,widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]]
     return lineImagePanel
