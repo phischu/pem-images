@@ -141,13 +141,18 @@ createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes
 
 createProgramListBox :: Frame () -> Input [ImageQueryStatement] -> IO (SingleListBox ())
 createProgramListBox parentFrame programChangedI = do
-    programListBox <- singleListBox parentFrame []
+    programListBox <- singleListBox parentFrame [
+        items := ["new statement"],
+        selection := 0]
     forkIO (forever (do
         maybeImageQueryStatements <- atomically (recv programChangedI)
         case maybeImageQueryStatements of
             Nothing -> return ()
             Just imagequerystatements -> do
-                set programListBox [items := map imageQueryStatementPrinter imagequerystatements]))
+                index <- Wx.get programListBox selection
+                set programListBox [
+                    items := map imageQueryStatementPrinter imagequerystatements ++ ["new statement"],
+                    selection := index + 1]))
     return programListBox
 
 createRunProgramButton :: Frame () -> Output Request -> IO (Button ())
