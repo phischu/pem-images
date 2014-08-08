@@ -1,7 +1,9 @@
 module GUI where
 
 import Run (run)
-import ImageQuery (ImageQueryStatement)
+import ImageQuery (
+    ImageQueryStatement(GetImageQueryResult),
+    ImageQuery(ImageOfAverage))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -11,9 +13,10 @@ import Graphics.UI.WX (
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
     fileSaveDialog,fileOpenDialog,errorDialog,
-    Prop((:=)),set,text,items,sz,position,pt,
+    Prop((:=)),set,text,items,sz,position,pt,selection,
     on,command,
     layout,widget,row,column,minsize)
+import qualified  Graphics.UI.WX as Wx (get)
 
 import MVC (
     runMVC,Model,View,Controller,asPipe,
@@ -33,7 +36,8 @@ data Program =
 data Request =
     RequestSaveProgram FilePath |
     RequestLoadProgram [ImageQueryStatement] |
-    RequestRunProgram
+    RequestRunProgram |
+    RequestAddStatement Int ImageQueryStatement
 
 data Response =
     ResponseSaveProgram FilePath [ImageQueryStatement] |
@@ -55,7 +59,13 @@ model = asPipe (forever (do
             yield (ResponseProgramChanged imagequerystatements)
         RequestRunProgram -> do
             Program imagequerystatements <- get
-            yield (ResponseRunProgram imagequerystatements)))
+            yield (ResponseRunProgram imagequerystatements)
+        RequestAddStatement index imagequerystatement -> do
+            Program imagequerystatements <- get
+            let (prefix,suffix) = splitAt index imagequerystatements
+                imagequerystatements' = prefix ++ [imagequerystatement] ++ suffix
+            put (Program imagequerystatements')
+            yield (ResponseProgramChanged imagequerystatements')))
 
 wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
@@ -63,26 +73,31 @@ wx = managed (\k -> do
     (saveProgramO,saveProgramI)       <- spawn Single
     (loadProgramO,loadProgramI)       <- spawn Single
     (runProgramO,runProgramI)         <- spawn Single
+    (addStatementO,addStatementI)     <- spawn Single
     (programChangedO,programChangedI) <- spawn Single
 
     forkIO (start (do
 
-        parentFrame       <- frame [text := "Image Processing",position := pt 100 100]
-        saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
-        loadProgramButton <- createLoadProgramButton parentFrame loadProgramO
-        runProgramButton  <- createRunProgramButton parentFrame runProgramO
-        programListBox    <- createProgramListBox parentFrame programChangedI
+        parentFrame         <- frame [text := "Image Processing",position := pt 100 100]
+        saveProgramButton   <- createSaveProgramButton parentFrame saveProgramO
+        loadProgramButton   <- createLoadProgramButton parentFrame loadProgramO
+        runProgramButton    <- createRunProgramButton parentFrame runProgramO
+        programListBox      <- createProgramListBox parentFrame programChangedI
+        addStatementControl <- createAddStatementControl programListBox parentFrame addStatementO
 
-        let frameLayout = column 5 [
-                minsize (sz 500 500) (widget programListBox),
-                row 5 [
-                    widget loadProgramButton,
-                    widget saveProgramButton,
-                    widget runProgramButton]]
+        let frameLayout = row 5 [
+                column 5 [
+                    minsize (sz 500 500) (widget programListBox),
+                    row 5 [
+                        widget loadProgramButton,
+                        widget saveProgramButton,
+                        widget runProgramButton]],
+                widget addStatementControl]
 
         set parentFrame [layout := frameLayout]))
 
-    let inputs = [saveProgramI,loadProgramI,runProgramI]
+    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI]
+
         sink (ResponseSaveProgram filepath imagequerystatements) = do
             writeFile filepath (imageQueriesPrinter imagequerystatements)
         sink (ResponseProgramChanged imagequerystatements) = do
@@ -141,3 +156,12 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
     sendRunProgramRequest = do
         atomically (send runProgramO RequestRunProgram)
         return ()
+
+createAddStatementControl :: SingleListBox () -> Frame () -> Output Request -> IO (Button ())
+createAddStatementControl programListBox parentFrame addStatementO = button parentFrame attributes where
+    attributes = [text := "AverageImage", on command := sendAverageImageRequest]
+    sendAverageImageRequest = do
+        index <- Wx.get programListBox selection
+        atomically (send addStatementO (RequestAddStatement index (GetImageQueryResult ImageOfAverage)))
+        return ()
+
