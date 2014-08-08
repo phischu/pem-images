@@ -3,8 +3,9 @@ module GUI where
 import Run (run)
 import ImageQuery (
     ImageQueryStatement(GetImageQueryResult),
-    ImageQuery(ImageOfAverage,IslandImage),
-    Polarity(Dark,Bright))
+    ImageQuery(ImageOfAverage,IslandImage,LineImage),
+    Polarity(Dark,Bright),
+    Orientation(Horizontal,Vertical))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -170,9 +171,11 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     addStatementPanel  <- panel parentFrame []
     averageImageButton <- createAverageImageButton programListBox addStatementPanel addStatementO
     islandImagePanel   <- createIslandImagePanel programListBox addStatementPanel addStatementO
+    lineImagePanel     <- createLineImagePanel programListBox addStatementPanel addStatementO
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImageButton,
-        widget islandImagePanel]]
+        widget islandImagePanel,
+        widget lineImagePanel]]
     return addStatementPanel
 
 createAverageImageButton :: SingleListBox () -> Panel () -> Output Request -> IO (Button ())
@@ -185,21 +188,32 @@ createAverageImageButton programListBox addStatementPanel addStatementO = button
 
 createIslandImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
 createIslandImagePanel programListBox addStatementPanel addStatementO = do
-
     islandImagePanel <- panel addStatementPanel []
-
     polarityChoice <- choice islandImagePanel [items := ["dark","bright"],selection := 0]
-
     let sendIslandImageRequest = do
-
             index <- Wx.get programListBox selection
             polaritySelection <- Wx.get polarityChoice selection
             let polarity = if polaritySelection == 0 then Dark else Bright
-
             atomically (send addStatementO (RequestAddStatement index (GetImageQueryResult (IslandImage polarity))))
             return ()
     islandImageButton <- button islandImagePanel [text := "IslandImage", on command := sendIslandImageRequest]
-    
     Wx.set islandImagePanel [layout := row 5 [widget islandImageButton,widget polarityChoice]]
-
     return islandImagePanel
+
+createLineImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
+createLineImagePanel programListBox addStatementPanel addStatementO = do
+    lineImagePanel <- panel addStatementPanel []
+    orientationChoice <- choice lineImagePanel [items := ["horizontal","vertical"],selection := 0]
+    let sendLineImageRequest = do
+            index <- Wx.get programListBox selection
+            orientationSelection <- Wx.get orientationChoice selection
+            let orientation = if orientationSelection == 0 then Horizontal else Vertical
+                x = undefined
+                y = undefined
+                l = undefined
+                imagequery = GetImageQueryResult (LineImage orientation x y l)
+            atomically (send addStatementO (RequestAddStatement index imagequery))
+            return ()
+    lineImageButton <- button lineImagePanel [text := "LineImage", on command := sendLineImageRequest]
+    Wx.set lineImagePanel [layout := row 5 [widget lineImageButton,widget orientationChoice]]
+    return lineImagePanel
