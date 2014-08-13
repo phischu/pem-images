@@ -20,7 +20,7 @@ import Graphics.UI.WX (
     fileSaveDialog,fileOpenDialog,errorDialog,
     Prop((:=)),set,text,items,sz,position,pt,selection,text,
     on,command,
-    Layout,layout,widget,row,column,minsize,
+    Layout,layout,widget,row,column,minsize,boxed,
     panel,Panel,choice,entry)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
@@ -198,29 +198,32 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     islandQueryPanel        <- createStatementPanel islandQueryControl
 
     Wx.set addStatementPanel [layout := column 5 [
-        widget averageImagePanel,
-        widget islandImagePanel,
-        widget lineImagePanel,
-        widget channelPanel,
-        widget subrectPanel,
-        widget thresholdPanel,
-        widget smoothingPanel,
-        widget valueInPointPanel,
-        widget averageAroundPointPanel,
-        widget averageOfImagePanel,
-        widget islandQueryPanel]]
+        boxed "Parameters" (column 5 [
+            widget channelPanel,
+            widget subrectPanel,
+            widget thresholdPanel,
+            widget smoothingPanel]),
+        boxed "Output Image" (column 5 [
+            widget averageImagePanel,
+            widget islandImagePanel,
+            widget lineImagePanel]),
+        boxed "Table Entry" (column 5 [
+            widget valueInPointPanel,
+            widget averageAroundPointPanel,
+            widget averageOfImagePanel,
+            widget islandQueryPanel])]]
 
     return addStatementPanel
 
 data StatementControl = StatementControl String (Panel () -> IO ([Layout],IO ImageQueryStatement))
 
 averageImageControl :: StatementControl
-averageImageControl = StatementControl "Output Average Image" (\_ -> do
+averageImageControl = StatementControl "Average Image" (\_ -> do
     let getStatement = return (GetImageQueryResult ImageOfAverage)
     return ([],getStatement))
 
 islandImageControl :: StatementControl
-islandImageControl = StatementControl "Output Island Image" (\parentPanel -> do
+islandImageControl = StatementControl "Island Image" (\parentPanel -> do
     polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
     let getStatement = do
             polaritySelection <- Wx.get polarityChoice selection
@@ -229,7 +232,7 @@ islandImageControl = StatementControl "Output Island Image" (\parentPanel -> do
     return ([widget polarityChoice],getStatement))
 
 lineImageControl :: StatementControl
-lineImageControl = StatementControl "Output Line Image" (\parentPanel -> do
+lineImageControl = StatementControl "Line Image" (\parentPanel -> do
     orientationChoice <- choice parentPanel [items := ["Horizontal","Vertical"],selection := 0]
     xEntry <- entry parentPanel [text := "0"]
     yEntry <- entry parentPanel [text := "0"]
