@@ -6,7 +6,7 @@ import ImageQuery (
     ImageQuery(ImageOfAverage,IslandImage,LineImage),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
-    ImageQueryParameter(Channel,SubRect))
+    ImageQueryParameter(Channel,SubRect,Threshold))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -188,13 +188,15 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     lineImagePanel    <- createStatementPanel lineImageControl
     channelPanel      <- createStatementPanel channelControl
     subrectPanel      <- createStatementPanel subrectControl
+    thresholdPanel    <- createStatementPanel thresholdControl
 
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
         widget islandImagePanel,
         widget lineImagePanel,
         widget channelPanel,
-        widget subrectPanel]]
+        widget subrectPanel,
+        widget thresholdPanel]]
 
     return addStatementPanel
 
@@ -248,3 +250,11 @@ subrectControl = StatementControl "Subrect" (\parentPanel -> do
             [x,y,w,h] <- forM parameterEntries (\parameterEntry -> Wx.get parameterEntry text >>= return . read)
             return (SetImageQueryParameter (SubRect (x,y,w,h)))
     return (map widget parameterEntries,getStatement))
+
+thresholdControl :: StatementControl
+thresholdControl = StatementControl "Threshold" (\parentPanel -> do
+    thresholdEntry <- entry parentPanel [text := "0"]
+    let getStatement = do
+            thresholdText <- Wx.get thresholdEntry text
+            return (SetImageQueryParameter (Threshold (read thresholdText)))
+    return ([widget thresholdEntry],getStatement))
