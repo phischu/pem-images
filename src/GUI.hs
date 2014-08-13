@@ -168,11 +168,25 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
 
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
+
     addStatementPanel  <- panel parentFrame []
-    averageImagePanel  <- createAverageImagePanel addStatementPanel programListBox addStatementO
-    islandImagePanel   <- createIslandImagePanel addStatementPanel programListBox addStatementO
-    lineImagePanel     <- createLineImagePanel addStatementPanel programListBox addStatementO
-    channelPanel       <- createChannelPanel addStatementPanel programListBox addStatementO
+
+    let createStatementPanel (StatementControl buttonText createOptions) = do
+            statementPanel <- panel addStatementPanel []
+            (optionLayouts,getStatement) <- createOptions statementPanel
+            let sendStatement = do
+                    index <- Wx.get programListBox selection
+                    statement <- getStatement
+                    atomically (send addStatementO (RequestAddStatement index statement))
+                    return ()
+            statementButton <- button statementPanel [text := buttonText, on command := sendStatement]
+            Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
+            return statementPanel
+
+    averageImagePanel  <- createStatementPanel averageImageControl
+    islandImagePanel   <- createStatementPanel islandImageControl
+    lineImagePanel     <- createStatementPanel lineImageControl
+    channelPanel       <- createStatementPanel channelControl
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
         widget islandImagePanel,
@@ -180,28 +194,15 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
         widget channelPanel]]
     return addStatementPanel
 
-createStatementPanel ::
-    String -> (Panel () -> IO ([Layout],IO ImageQueryStatement)) ->
-    Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
-createStatementPanel buttonText createOptions parentPanel programListBox addStatementO = do
-    statementPanel <- panel parentPanel []
-    (optionLayouts,getStatement) <- createOptions statementPanel
-    let sendStatement = do
-            index <- Wx.get programListBox selection
-            statement <- getStatement
-            atomically (send addStatementO (RequestAddStatement index statement))
-            return ()
-    statementButton <- button statementPanel [text := buttonText, on command := sendStatement]
-    Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
-    return statementPanel
+data StatementControl = StatementControl String (Panel () -> IO ([Layout],IO ImageQueryStatement))
 
-createAverageImagePanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
-createAverageImagePanel = createStatementPanel "Output Average Image" (\_ -> do
+averageImageControl :: StatementControl
+averageImageControl = StatementControl "Output Average Image" (\_ -> do
     let getStatement = return (GetImageQueryResult ImageOfAverage)
     return ([],getStatement))
 
-createIslandImagePanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
-createIslandImagePanel = createStatementPanel "Output Island Image" (\parentPanel -> do
+islandImageControl :: StatementControl
+islandImageControl = StatementControl "Output Island Image" (\parentPanel -> do
     polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
     let getStatement = do
             polaritySelection <- Wx.get polarityChoice selection
@@ -209,8 +210,8 @@ createIslandImagePanel = createStatementPanel "Output Island Image" (\parentPane
             return (GetImageQueryResult (IslandImage polarity))
     return ([widget polarityChoice],getStatement))
 
-createLineImagePanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
-createLineImagePanel = createStatementPanel "Output Line Image" (\parentPanel -> do
+lineImageControl :: StatementControl
+lineImageControl = StatementControl "Output Line Image" (\parentPanel -> do
     orientationChoice <- choice parentPanel [items := ["Horizontal","Vertical"],selection := 0]
     xEntry <- entry parentPanel [text := "0"]
     yEntry <- entry parentPanel [text := "0"]
@@ -228,8 +229,8 @@ createLineImagePanel = createStatementPanel "Output Line Image" (\parentPanel ->
         layouts = [widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]
     return (layouts,getStatement))
 
-createChannelPanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
-createChannelPanel = createStatementPanel "Channel" (\parentPanel -> do
+channelControl :: StatementControl
+channelControl = StatementControl "Channel" (\parentPanel -> do
     channelChoice <- choice parentPanel [items := ["Red","Green","Blue"],selection := 0]
     let getStatement = do
             channelSelection <- Wx.get channelChoice selection
