@@ -6,7 +6,7 @@ import ImageQuery (
     ImageQuery(ImageOfAverage,IslandImage,LineImage),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
-    ImageQueryParameter(Channel))
+    ImageQueryParameter(Channel,SubRect))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -31,7 +31,7 @@ import MVC (
 import Pipes (await,yield)
 import Control.Monad.State.Class (get,put)
 
-import Control.Monad (forever)
+import Control.Monad (forever,replicateM,forM)
 import Data.Monoid (mconcat)
 
 data Program =
@@ -183,15 +183,19 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
             Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
             return statementPanel
 
-    averageImagePanel  <- createStatementPanel averageImageControl
-    islandImagePanel   <- createStatementPanel islandImageControl
-    lineImagePanel     <- createStatementPanel lineImageControl
-    channelPanel       <- createStatementPanel channelControl
+    averageImagePanel <- createStatementPanel averageImageControl
+    islandImagePanel  <- createStatementPanel islandImageControl
+    lineImagePanel    <- createStatementPanel lineImageControl
+    channelPanel      <- createStatementPanel channelControl
+    subrectPanel      <- createStatementPanel subrectControl
+
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
         widget islandImagePanel,
         widget lineImagePanel,
-        widget channelPanel]]
+        widget channelPanel,
+        widget subrectPanel]]
+
     return addStatementPanel
 
 data StatementControl = StatementControl String (Panel () -> IO ([Layout],IO ImageQueryStatement))
@@ -236,3 +240,11 @@ channelControl = StatementControl "Channel" (\parentPanel -> do
             channelSelection <- Wx.get channelChoice selection
             return (SetImageQueryParameter (Channel channelSelection))
     return ([widget channelChoice],getStatement))
+
+subrectControl :: StatementControl
+subrectControl = StatementControl "Subrect" (\parentPanel -> do
+    parameterEntries <- replicateM 4 (entry parentPanel [text := "0"])
+    let getStatement = do
+            [x,y,w,h] <- forM parameterEntries (\parameterEntry -> Wx.get parameterEntry text >>= return . read)
+            return (SetImageQueryParameter (SubRect (x,y,w,h)))
+    return (map widget parameterEntries,getStatement))
