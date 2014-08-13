@@ -171,8 +171,8 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     addStatementPanel  <- panel parentFrame []
     averageImagePanel  <- createAverageImagePanel addStatementPanel programListBox addStatementO
     islandImagePanel   <- createIslandImagePanel addStatementPanel programListBox addStatementO
-    lineImagePanel     <- createLineImagePanel programListBox addStatementPanel addStatementO
-    channelPanel       <- createChannelPanel programListBox addStatementPanel addStatementO
+    lineImagePanel     <- createLineImagePanel addStatementPanel programListBox addStatementO
+    channelPanel       <- createChannelPanel addStatementPanel programListBox addStatementO
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
         widget islandImagePanel,
@@ -215,15 +215,13 @@ createIslandImagePanel parentPanel = createStatementPanel parentPanel "Output Is
             return (GetImageQueryResult (IslandImage polarity))
     return ([widget polarityChoice],getStatement))
 
-createLineImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
-createLineImagePanel programListBox addStatementPanel addStatementO = do
-    lineImagePanel <- panel addStatementPanel []
-    orientationChoice <- choice lineImagePanel [items := ["horizontal","vertical"],selection := 0]
-    xEntry <- entry lineImagePanel [text := "0"]
-    yEntry <- entry lineImagePanel [text := "0"]
-    lEntry <- entry lineImagePanel [text := "0"]
-    let sendLineImageRequest = do
-            index <- Wx.get programListBox selection
+createLineImagePanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
+createLineImagePanel parentPanel = createStatementPanel parentPanel "Output Line Image" (do
+    orientationChoice <- choice parentPanel [items := ["horizontal","vertical"],selection := 0]
+    xEntry <- entry parentPanel [text := "0"]
+    yEntry <- entry parentPanel [text := "0"]
+    lEntry <- entry parentPanel [text := "0"]
+    let getStatement = do
             orientationSelection <- Wx.get orientationChoice selection
             xText <- Wx.get xEntry text
             yText <- Wx.get yEntry text
@@ -232,24 +230,14 @@ createLineImagePanel programListBox addStatementPanel addStatementO = do
                 x = read xText
                 y = read yText
                 l = read lText
-                imagequery = GetImageQueryResult (LineImage orientation x y l)
-            atomically (send addStatementO (RequestAddStatement index imagequery))
-            return ()
-    lineImageButton <- button lineImagePanel [text := "LineImage", on command := sendLineImageRequest]
-    Wx.set lineImagePanel [layout := row 5 [
-        widget lineImageButton,widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]]
-    return lineImagePanel
+            return (GetImageQueryResult (LineImage orientation x y l))
+        layouts = [widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]
+    return (layouts,getStatement))
 
-createChannelPanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
-createChannelPanel programListBox addStatementPanel addStatementO = do
-    channelPanel <- panel addStatementPanel []
-    channelChoice <- choice channelPanel [items := ["red","green","blue"],selection := 0]
-    let sendChannelRequest = do
-            index <- Wx.get programListBox selection
+createChannelPanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
+createChannelPanel parentPanel = createStatementPanel parentPanel "Channel" (do
+    channelChoice <- choice parentPanel [items := ["red","green","blue"],selection := 0]
+    let getStatement = do
             channelSelection <- Wx.get channelChoice selection
-            atomically (send addStatementO (RequestAddStatement index (
-                SetImageQueryParameter (Channel channelSelection))))
-            return ()
-    channelButton <- button channelPanel [text := "Channel", on command := sendChannelRequest]
-    Wx.set channelPanel [layout := row 5 [widget channelButton,widget channelChoice]]
-    return channelPanel
+            return (SetImageQueryParameter (Channel channelSelection))
+    return ([widget channelChoice],getStatement))
