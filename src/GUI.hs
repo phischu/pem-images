@@ -184,21 +184,15 @@ createStatementPanel ::
     Panel () -> String -> IO ([Layout],IO ImageQueryStatement) ->
     SingleListBox () -> Output Request -> IO (Panel ())
 createStatementPanel parentPanel buttonText createOptions programListBox addStatementO = do
-
     statementPanel <- panel parentPanel []
-
     (optionLayouts,getStatement) <- createOptions
-
     let sendStatement = do
             index <- Wx.get programListBox selection
             statement <- getStatement
             atomically (send addStatementO (RequestAddStatement index statement))
             return ()
-
     statementButton <- button statementPanel [text := buttonText, on command := sendStatement]
-
     Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
-
     return statementPanel
 
 createAverageImagePanel :: Panel () -> SingleListBox () -> Output Request -> IO (Panel ())
