@@ -2,10 +2,11 @@ module GUI where
 
 import Run (run)
 import ImageQuery (
-    ImageQueryStatement(GetImageQueryResult),
+    ImageQueryStatement(GetImageQueryResult,SetImageQueryParameter),
     ImageQuery(ImageOfAverage,IslandImage,LineImage),
     Polarity(Dark,Bright),
-    Orientation(Horizontal,Vertical))
+    Orientation(Horizontal,Vertical),
+    ImageQueryParameter(Channel))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -171,10 +172,12 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     averageImageButton <- createAverageImageButton programListBox addStatementPanel addStatementO
     islandImagePanel   <- createIslandImagePanel programListBox addStatementPanel addStatementO
     lineImagePanel     <- createLineImagePanel programListBox addStatementPanel addStatementO
+    channelPanel       <- createChannelPanel programListBox addStatementPanel addStatementO
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImageButton,
         widget islandImagePanel,
-        widget lineImagePanel]]
+        widget lineImagePanel,
+        widget channelPanel]]
     return addStatementPanel
 
 createAverageImageButton :: SingleListBox () -> Panel () -> Output Request -> IO (Button ())
@@ -223,3 +226,17 @@ createLineImagePanel programListBox addStatementPanel addStatementO = do
     Wx.set lineImagePanel [layout := row 5 [
         widget lineImageButton,widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]]
     return lineImagePanel
+
+createChannelPanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
+createChannelPanel programListBox addStatementPanel addStatementO = do
+    channelPanel <- panel addStatementPanel []
+    channelChoice <- choice channelPanel [items := ["red","green","blue"],selection := 0]
+    let sendChannelRequest = do
+            index <- Wx.get programListBox selection
+            channelSelection <- Wx.get channelChoice selection
+            atomically (send addStatementO (RequestAddStatement index (
+                SetImageQueryParameter (Channel channelSelection))))
+            return ()
+    channelButton <- button channelPanel [text := "Channel", on command := sendChannelRequest]
+    Wx.set channelPanel [layout := row 5 [widget channelButton,widget channelChoice]]
+    return channelPanel
