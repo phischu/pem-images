@@ -169,24 +169,36 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
     addStatementPanel  <- panel parentFrame []
-    averageImageButton <- createAverageImageButton programListBox addStatementPanel addStatementO
+    averageImagePanel <- createAverageImagePanel programListBox addStatementPanel addStatementO
     islandImagePanel   <- createIslandImagePanel programListBox addStatementPanel addStatementO
     lineImagePanel     <- createLineImagePanel programListBox addStatementPanel addStatementO
     channelPanel       <- createChannelPanel programListBox addStatementPanel addStatementO
     Wx.set addStatementPanel [layout := column 5 [
-        widget averageImageButton,
+        widget averageImagePanel,
         widget islandImagePanel,
         widget lineImagePanel,
         widget channelPanel]]
     return addStatementPanel
 
-createAverageImageButton :: SingleListBox () -> Panel () -> Output Request -> IO (Button ())
-createAverageImageButton programListBox addStatementPanel addStatementO = button addStatementPanel attributes where
-    attributes = [text := "AverageImage", on command := sendAverageImageRequest]
-    sendAverageImageRequest = do
-        index <- Wx.get programListBox selection
-        atomically (send addStatementO (RequestAddStatement index (GetImageQueryResult ImageOfAverage)))
-        return ()
+createStatementPanel ::
+    String -> (Panel () -> IO (Panel (),IO ImageQueryStatement)) ->
+    SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
+createStatementPanel buttonText createOptions programListBox addStatementPanel addStatementO = do
+    statementPanel <- panel addStatementPanel []
+    (optionsPanel,getStatement) <- createOptions addStatementPanel
+    let sendStatement = do
+            index <- Wx.get programListBox selection
+            statement <- getStatement
+            atomically (send addStatementO (RequestAddStatement index statement))
+            return ()
+    statementButton <- button statementPanel [text := buttonText, on command := sendStatement]
+    Wx.set statementPanel [layout := row 5 [widget statementButton,widget optionsPanel]]
+    return statementPanel
+
+createAverageImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
+createAverageImagePanel = createStatementPanel "AverageImage" (\parentPanel -> do
+    averageImagePanel <- panel parentPanel []
+    return (averageImagePanel,return (GetImageQueryResult ImageOfAverage)))
 
 createIslandImagePanel :: SingleListBox () -> Panel () -> Output Request -> IO (Panel ())
 createIslandImagePanel programListBox addStatementPanel addStatementO = do
