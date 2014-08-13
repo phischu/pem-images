@@ -6,7 +6,7 @@ import ImageQuery (
     ImageQuery(ImageOfAverage,IslandImage,LineImage),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
-    ImageQueryParameter(Channel,SubRect,Threshold))
+    ImageQueryParameter(Channel,SubRect,Threshold,Smoothing))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -189,6 +189,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     channelPanel      <- createStatementPanel channelControl
     subrectPanel      <- createStatementPanel subrectControl
     thresholdPanel    <- createStatementPanel thresholdControl
+    smoothingPanel    <- createStatementPanel smoothingControl
 
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
@@ -196,7 +197,8 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
         widget lineImagePanel,
         widget channelPanel,
         widget subrectPanel,
-        widget thresholdPanel]]
+        widget thresholdPanel,
+        widget smoothingPanel]]
 
     return addStatementPanel
 
@@ -258,3 +260,11 @@ thresholdControl = StatementControl "Threshold" (\parentPanel -> do
             thresholdText <- Wx.get thresholdEntry text
             return (SetImageQueryParameter (Threshold (read thresholdText)))
     return ([widget thresholdEntry],getStatement))
+
+smoothingControl :: StatementControl
+smoothingControl = StatementControl "Smoothing" (\parentPanel -> do
+    smoothingEntry <- entry parentPanel [text := "0"]
+    let getStatement = do
+            smoothingText <- Wx.get smoothingEntry text
+            return (SetImageQueryParameter (Smoothing (read smoothingText)))
+    return ([widget smoothingEntry],getStatement))
