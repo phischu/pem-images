@@ -7,7 +7,8 @@ import ImageQuery (
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
     ImageQueryParameter(Channel,SubRect,Threshold,Smoothing),
-    TableQuery(ValueInPoint))
+    TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
+    IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -184,14 +185,17 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
             Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
             return statementPanel
 
-    averageImagePanel <- createStatementPanel averageImageControl
-    islandImagePanel  <- createStatementPanel islandImageControl
-    lineImagePanel    <- createStatementPanel lineImageControl
-    channelPanel      <- createStatementPanel channelControl
-    subrectPanel      <- createStatementPanel subrectControl
-    thresholdPanel    <- createStatementPanel thresholdControl
-    smoothingPanel    <- createStatementPanel smoothingControl
-    valueInPointPanel <- createStatementPanel valueInPointControl
+    averageImagePanel       <- createStatementPanel averageImageControl
+    islandImagePanel        <- createStatementPanel islandImageControl
+    lineImagePanel          <- createStatementPanel lineImageControl
+    channelPanel            <- createStatementPanel channelControl
+    subrectPanel            <- createStatementPanel subrectControl
+    thresholdPanel          <- createStatementPanel thresholdControl
+    smoothingPanel          <- createStatementPanel smoothingControl
+    valueInPointPanel       <- createStatementPanel valueInPointControl
+    averageAroundPointPanel <- createStatementPanel averageAroundPointControl
+    averageOfImagePanel     <- createStatementPanel averageOfImageControl
+    islandQueryPanel        <- createStatementPanel islandQueryControl
 
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
@@ -201,7 +205,10 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
         widget subrectPanel,
         widget thresholdPanel,
         widget smoothingPanel,
-        widget valueInPointPanel]]
+        widget valueInPointPanel,
+        widget averageAroundPointPanel,
+        widget averageOfImagePanel,
+        widget islandQueryPanel]]
 
     return addStatementPanel
 
@@ -280,3 +287,33 @@ valueInPointControl = StatementControl "Value in Point" (\parentPanel -> do
             yText <- Wx.get yEntry text
             return (GetImageQueryResult (TableQuery (ValueInPoint (read xText) (read yText))))
     return (map widget [xEntry,yEntry],getStatement))
+
+averageAroundPointControl :: StatementControl
+averageAroundPointControl = StatementControl "Average Around Point" (\parentPanel -> do
+    [xEntry,yEntry,rEntry] <- replicateM 3 (entry parentPanel [text := "0"])
+    let getStatement = do
+            xText <- Wx.get xEntry text
+            yText <- Wx.get yEntry text
+            rText <- Wx.get rEntry text
+            return (GetImageQueryResult (TableQuery (AverageAroundPoint (read xText) (read yText) (read rText))))
+    return (map widget [xEntry,yEntry,rEntry],getStatement))
+
+averageOfImageControl :: StatementControl
+averageOfImageControl = StatementControl "Average Of Image" (\_ -> do
+    let getStatement = return (GetImageQueryResult (TableQuery AverageOfImage))
+    return ([],getStatement))
+
+islandQueryControl :: StatementControl
+islandQueryControl = StatementControl "Island Query" (\parentPanel -> do
+    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
+    islandQueryChoice <- choice parentPanel [items := ["Number","Average Area","Average Outline"],selection := 0]
+    let getStatement = do
+            polaritySelection <- Wx.get polarityChoice selection
+            islandQuerySelection <- Wx.get islandQueryChoice selection
+            let polarity = if polaritySelection == 0 then Dark else Bright
+                islandQuery = case islandQuerySelection of
+                    0 -> NumberOfIslands
+                    1 -> AverageAreaOfIslands
+                    2 -> AverageOutlineOfIslands
+            return (GetImageQueryResult (TableQuery (IslandQuery polarity islandQuery)))
+    return ([widget polarityChoice,widget islandQueryChoice],getStatement))
