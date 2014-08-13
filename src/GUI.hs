@@ -3,10 +3,11 @@ module GUI where
 import Run (run)
 import ImageQuery (
     ImageQueryStatement(GetImageQueryResult,SetImageQueryParameter),
-    ImageQuery(ImageOfAverage,IslandImage,LineImage),
+    ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
-    ImageQueryParameter(Channel,SubRect,Threshold,Smoothing))
+    ImageQueryParameter(Channel,SubRect,Threshold,Smoothing),
+    TableQuery(ValueInPoint))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import Text.Parsec.String (parseFromFile)
@@ -190,6 +191,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     subrectPanel      <- createStatementPanel subrectControl
     thresholdPanel    <- createStatementPanel thresholdControl
     smoothingPanel    <- createStatementPanel smoothingControl
+    valueInPointPanel <- createStatementPanel valueInPointControl
 
     Wx.set addStatementPanel [layout := column 5 [
         widget averageImagePanel,
@@ -198,7 +200,8 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
         widget channelPanel,
         widget subrectPanel,
         widget thresholdPanel,
-        widget smoothingPanel]]
+        widget smoothingPanel,
+        widget valueInPointPanel]]
 
     return addStatementPanel
 
@@ -268,3 +271,12 @@ smoothingControl = StatementControl "Smoothing" (\parentPanel -> do
             smoothingText <- Wx.get smoothingEntry text
             return (SetImageQueryParameter (Smoothing (read smoothingText)))
     return ([widget smoothingEntry],getStatement))
+
+valueInPointControl :: StatementControl
+valueInPointControl = StatementControl "Value in Point" (\parentPanel -> do
+    [xEntry,yEntry] <- replicateM 2 (entry parentPanel [text := "0"])
+    let getStatement = do
+            xText <- Wx.get xEntry text
+            yText <- Wx.get yEntry text
+            return (GetImageQueryResult (TableQuery (ValueInPoint (read xText) (read yText))))
+    return (map widget [xEntry,yEntry],getStatement))
