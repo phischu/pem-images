@@ -21,7 +21,7 @@ import Graphics.UI.WX (
     Prop((:=)),set,text,items,sz,position,pt,selection,text,
     on,command,
     Layout,layout,widget,row,column,minsize,boxed,
-    panel,Panel,choice,entry)
+    panel,Panel,choice,entry,staticText,StaticText)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
 import MVC (
@@ -87,12 +87,13 @@ model = asPipe (forever (do
 wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
 
-    (saveProgramO,saveProgramI)       <- spawn Single
-    (loadProgramO,loadProgramI)       <- spawn Single
-    (runProgramO,runProgramI)         <- spawn Single
-    (addStatementO,addStatementI)     <- spawn Single
-    (programChangedO,programChangedI) <- spawn Single
-    (inputPathO,inputPathI)           <- spawn Single
+    (saveProgramO,saveProgramI)           <- spawn Single
+    (loadProgramO,loadProgramI)           <- spawn Single
+    (runProgramO,runProgramI)             <- spawn Single
+    (addStatementO,addStatementI)         <- spawn Single
+    (programChangedO,programChangedI)     <- spawn Single
+    (changeInputPathO,changeInputPathI)   <- spawn Single
+    (inputPathChangedO,inputPathChangedI) <- spawn Single
 
     forkIO (start (do
 
@@ -102,7 +103,8 @@ wx = managed (\k -> do
         runProgramButton  <- createRunProgramButton parentFrame runProgramO
         programListBox    <- createProgramListBox parentFrame programChangedI
         addStatementPanel <- createAddStatementPanel programListBox parentFrame addStatementO
-        inputPathButton   <- createInputPathButton parentFrame inputPathO
+        inputPathButton   <- createInputPathButton parentFrame changeInputPathO
+        inputPathText     <- createInputPathText parentFrame inputPathChangedI
 
         let frameLayout = row 5 [
                 column 5 [
@@ -113,11 +115,13 @@ wx = managed (\k -> do
                         widget runProgramButton]],
                 column 5 [
                     widget addStatementPanel,
-                    widget inputPathButton]]
+                    boxed "Inputs" (row 5 [
+                        widget inputPathButton,
+                        widget inputPathText])]]
 
         set parentFrame [layout := frameLayout]))
 
-    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,inputPathI]
+    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI]
 
         sink (ResponseSaveProgram filepath imagequerystatements) = do
             writeFile filepath (imageQueriesPrinter imagequerystatements)
@@ -128,7 +132,8 @@ wx = managed (\k -> do
             result <- run inputpath imagequerystatements
             putStrLn (either id (const "Run finished!") result)
         sink (ResponseInputPath inputpath) = do
-            putStrLn ("input path chosen: " ++ inputpath)
+            atomically (send inputPathChangedO inputpath)
+            return ()
 
     k (asSink sink,asInput (mconcat inputs)))
 
@@ -196,6 +201,16 @@ createInputPathButton parentFrame inputPathO =
                 Just inputpath -> do
                     atomically (send inputPathO (RequestInputPath inputpath))
                     return ()]
+
+createInputPathText :: Frame () -> Input InputPath -> IO (StaticText ())
+createInputPathText parentFrame inputPathChangedI = do
+    inputPathText <- staticText parentFrame [text := "."]
+    forkIO (forever (do
+        maybeInputPath <- atomically (recv inputPathChangedI)
+        case maybeInputPath of
+            Nothing -> return ()
+            Just inputpath -> Wx.set inputPathText [text := inputpath]))
+    return inputPathText
 
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
