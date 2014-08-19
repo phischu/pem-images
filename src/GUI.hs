@@ -17,7 +17,7 @@ import Graphics.UI.WX (
     start,
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
-    fileSaveDialog,fileOpenDialog,errorDialog,
+    fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,
     Prop((:=)),set,text,items,sz,position,pt,selection,text,
     on,command,
     Layout,layout,widget,row,column,minsize,boxed,
@@ -31,47 +31,58 @@ import MVC (
     Output,send,
     Input,recv)
 import Pipes (await,yield)
-import Control.Monad.State.Class (get,put)
+import Control.Monad.State.Class (get,put,gets)
 
 import Control.Monad (forever,replicateM,forM)
 import Data.Monoid (mconcat)
 
-data Program =
-    Program [ImageQueryStatement]
+data Program = Program {
+    imageQueryStatements :: [ImageQueryStatement],
+    inputPath :: InputPath}
 
 data Request =
     RequestSaveProgram FilePath |
     RequestLoadProgram [ImageQueryStatement] |
     RequestRunProgram |
-    RequestAddStatement Int ImageQueryStatement
+    RequestAddStatement Int ImageQueryStatement |
+    RequestInputPath InputPath
 
 data Response =
     ResponseSaveProgram FilePath [ImageQueryStatement] |
     ResponseProgramChanged [ImageQueryStatement] |
-    ResponseRunProgram [ImageQueryStatement]
+    ResponseRunProgram InputPath [ImageQueryStatement] |
+    ResponseInputPath InputPath
+
+type InputPath = FilePath
 
 gui :: IO ()
-gui = runMVC (Program []) model wx >> return ()
+gui = runMVC (Program [] ".") model wx >> return ()
 
 model :: Model Program Request Response
 model = asPipe (forever (do
     request <- await
     case request of
         RequestSaveProgram filepath -> do
-            Program imagequerystatements <- get
+            imagequerystatements <- gets imageQueryStatements
             yield (ResponseSaveProgram filepath imagequerystatements)
         RequestLoadProgram imagequerystatements -> do
-            put (Program imagequerystatements)
+            inputpath <- gets inputPath
+            put (Program imagequerystatements inputpath)
             yield (ResponseProgramChanged imagequerystatements)
         RequestRunProgram -> do
-            Program imagequerystatements <- get
-            yield (ResponseRunProgram imagequerystatements)
+            Program imagequerystatements inputpath <- get
+            yield (ResponseRunProgram inputpath imagequerystatements)
         RequestAddStatement index imagequerystatement -> do
-            Program imagequerystatements <- get
+            imagequerystatements <- gets imageQueryStatements
+            inputpath <- gets inputPath
             let (prefix,suffix) = splitAt index imagequerystatements
                 imagequerystatements' = prefix ++ [imagequerystatement] ++ suffix
-            put (Program imagequerystatements')
-            yield (ResponseProgramChanged imagequerystatements')))
+            put (Program imagequerystatements' inputpath)
+            yield (ResponseProgramChanged imagequerystatements')
+        RequestInputPath inputpath -> do
+            program <- get
+            put (program {inputPath = inputpath})
+            yield (ResponseInputPath inputpath)))
 
 wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
@@ -81,6 +92,7 @@ wx = managed (\k -> do
     (runProgramO,runProgramI)         <- spawn Single
     (addStatementO,addStatementI)     <- spawn Single
     (programChangedO,programChangedI) <- spawn Single
+    (inputPathO,inputPathI)           <- spawn Single
 
     forkIO (start (do
 
@@ -90,6 +102,7 @@ wx = managed (\k -> do
         runProgramButton  <- createRunProgramButton parentFrame runProgramO
         programListBox    <- createProgramListBox parentFrame programChangedI
         addStatementPanel <- createAddStatementPanel programListBox parentFrame addStatementO
+        inputPathButton   <- createInputPathButton parentFrame inputPathO
 
         let frameLayout = row 5 [
                 column 5 [
@@ -98,20 +111,24 @@ wx = managed (\k -> do
                         widget loadProgramButton,
                         widget saveProgramButton,
                         widget runProgramButton]],
-                widget addStatementPanel]
+                column 5 [
+                    widget addStatementPanel,
+                    widget inputPathButton]]
 
         set parentFrame [layout := frameLayout]))
 
-    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI]
+    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,inputPathI]
 
         sink (ResponseSaveProgram filepath imagequerystatements) = do
             writeFile filepath (imageQueriesPrinter imagequerystatements)
         sink (ResponseProgramChanged imagequerystatements) = do
             atomically (send programChangedO imagequerystatements)
             return ()
-        sink (ResponseRunProgram imagequerystatements) = do
-            result <- run "data/Einbettung" imagequerystatements
-            print (either id (const "Run finished!") result)
+        sink (ResponseRunProgram inputpath imagequerystatements) = do
+            result <- run inputpath imagequerystatements
+            putStrLn (either id (const "Run finished!") result)
+        sink (ResponseInputPath inputpath) = do
+            putStrLn ("input path chosen: " ++ inputpath)
 
     k (asSink sink,asInput (mconcat inputs)))
 
@@ -167,6 +184,18 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
     sendRunProgramRequest = do
         atomically (send runProgramO RequestRunProgram)
         return ()
+
+createInputPathButton :: Frame () -> Output Request -> IO (Button ())
+createInputPathButton parentFrame inputPathO =
+    button parentFrame [
+        text := "Choose input path",
+        on command := do
+            maybeFilepath <- dirOpenDialog parentFrame False "Choose input path" ""
+            case maybeFilepath of
+                Nothing -> return ()
+                Just inputpath -> do
+                    atomically (send inputPathO (RequestInputPath inputpath))
+                    return ()]
 
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
@@ -320,3 +349,4 @@ islandQueryControl = StatementControl "Island Query" (\parentPanel -> do
                     2 -> AverageOutlineOfIslands
             return (GetImageQueryResult (TableQuery (IslandQuery polarity islandQuery)))
     return ([widget polarityChoice,widget islandQueryChoice],getStatement))
+
