@@ -6,7 +6,7 @@ import ImageQuery (
     ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
-    ImageQueryParameter(Channel,SubRect,Threshold,Smoothing),
+    ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands))
 import ImageQuery.Parser (imageQueriesParser)
@@ -35,6 +35,7 @@ import Control.Monad.State.Class (get,put,gets)
 
 import Control.Monad (forever,replicateM,forM)
 import Data.Monoid (mconcat)
+import Data.Maybe (fromMaybe)
 
 data Program = Program {
     imageQueryStatements :: [ImageQueryStatement],
@@ -234,6 +235,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     lineImagePanel          <- createStatementPanel lineImageControl
     channelPanel            <- createStatementPanel channelControl
     subrectPanel            <- createStatementPanel subrectControl
+    stencilPanel            <- createStatementPanel stencilControl
     thresholdPanel          <- createStatementPanel thresholdControl
     smoothingPanel          <- createStatementPanel smoothingControl
     valueInPointPanel       <- createStatementPanel valueInPointControl
@@ -245,6 +247,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
         boxed "Parameters" (column 5 [
             widget channelPanel,
             widget subrectPanel,
+            widget stencilPanel,
             widget thresholdPanel,
             widget smoothingPanel]),
         boxed "Output Image" (column 5 [
@@ -309,6 +312,15 @@ subrectControl = StatementControl "Subrect" (\parentPanel -> do
             [x,y,w,h] <- forM parameterEntries (\parameterEntry -> Wx.get parameterEntry text >>= return . read)
             return (SetImageQueryParameter (SubRect (x,y,w,h)))
     return (map widget parameterEntries,getStatement))
+
+stencilControl :: StatementControl
+stencilControl = StatementControl "Stencil" (\parentPanel -> do
+    let getStatement = do
+            maybeFilepath <- fileOpenDialog
+                parentPanel True True "Stencil Image"
+                [("Image Files",["*.png","*.bmp","*.gif"])] "" ""
+            return (SetImageQueryParameter (StencilImage (fromMaybe "" maybeFilepath) Nothing))
+    return ([],getStatement))
 
 thresholdControl :: StatementControl
 thresholdControl = StatementControl "Threshold" (\parentPanel -> do
