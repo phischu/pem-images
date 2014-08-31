@@ -11,6 +11,8 @@ import ImageQuery (
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
+import ImageLoading (loadImage)
+import ImageProcessing (juicyToImage,binarize)
 import Text.Parsec.String (parseFromFile)
 
 import Graphics.UI.WX (
@@ -34,8 +36,8 @@ import Pipes (await,yield)
 import Control.Monad.State.Class (get,put,gets)
 
 import Control.Monad (forever,replicateM,forM)
+import Control.Error (runEitherT)
 import Data.Monoid (mconcat)
-import Data.Maybe (fromMaybe)
 
 data Program = Program {
     imageQueryStatements :: [ImageQueryStatement],
@@ -319,7 +321,16 @@ stencilControl = StatementControl "Stencil" (\parentPanel -> do
             maybeFilepath <- fileOpenDialog
                 parentPanel True True "Stencil Image"
                 [("Image Files",["*.png","*.bmp","*.gif"])] "" ""
-            return (SetImageQueryParameter (StencilImage (fromMaybe "" maybeFilepath) Nothing))
+            case maybeFilepath of
+                Nothing -> return (SetImageQueryParameter (StencilImage "" Nothing))
+                Just filepath -> do
+                    eitherJuicyImage <- runEitherT (loadImage filepath)
+                    case eitherJuicyImage of
+                        Left _ -> return (SetImageQueryParameter (StencilImage "" Nothing))
+                        Right juicyImage ->
+                            return (SetImageQueryParameter (
+                                StencilImage filepath (Just (
+                                    binarize 0 (juicyToImage juicyImage)))))
     return ([],getStatement))
 
 thresholdControl :: StatementControl
