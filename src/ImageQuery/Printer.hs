@@ -7,7 +7,8 @@ import ImageQuery (
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
-    Orientation(Horizontal,Vertical))
+    Orientation(Horizontal,Vertical),
+    Channel(Red,Green,Blue))
 
 type Printer a = a -> String
 
@@ -22,7 +23,7 @@ imageQueryStatementPrinter (GetImageQueryResult imagequery) =
 
 imageQueryParameterPrinter :: Printer ImageQueryParameter
 imageQueryParameterPrinter (Threshold threshold) = "set_threshold " ++ show threshold
-imageQueryParameterPrinter (Channel channel) = "set_channel " ++ show channel
+imageQueryParameterPrinter (Channel channel) = "set_channel " ++ channelPrinter channel
 imageQueryParameterPrinter (Smoothing smoothing) = "set_smoothing " ++ show smoothing
 imageQueryParameterPrinter (SubRect (x,y,w,h)) = "set_subrect " ++ numbersPrinter [x,y,w,h]
 imageQueryParameterPrinter (StencilImage filepath _) = "set_stencil " ++ filepath
@@ -56,4 +57,8 @@ polarityPrinter Dark = "dark"
 numbersPrinter :: Printer [Int]
 numbersPrinter = unwords . map show
 
+channelPrinter :: Printer Channel
+channelPrinter Red = "red"
+channelPrinter Green = "green"
+channelPrinter Blue = "blue"
 

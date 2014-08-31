@@ -1,9 +1,9 @@
 module ImageQuery where
 
 import ImageProcessing (
-    Image,Rect,Threshold,
+    Image,Rect,Threshold,RGB(red,green,blue),
     valueInPoint,averageAroundPoint,averageOfImage,
-    cutOut,binarize,applyStencil,invert,blackAndWhite,
+    cutOut,binarize,applyStencil,invert,blackAndWhite,chooseChannel,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine)
 
@@ -28,7 +28,7 @@ data ImageQuery =
     IslandImage Polarity deriving Show
 
 data ImageQueryParameter =
-    Channel Int |
+    Channel Channel |
     SubRect Rect |
     StencilImage FilePath (Maybe (Image Bool)) |
     Threshold Threshold |
@@ -53,8 +53,13 @@ data Polarity =
     Dark |
     Bright deriving Show
 
+data Channel =
+    Red |
+    Green |
+    Blue deriving Show
+
 data ImageQueryParameters = ImageQueryParameters {
-    _channel :: Int,
+    _channel :: Channel,
     _subRect :: Maybe Rect,
     _stencilImage :: Maybe (Image Bool),
     _threshold :: Threshold,
@@ -83,7 +88,7 @@ instance Monoid ImageQueryResult where
             (mappend imagelines1 imagelines2)
 
 initialImageQueryParameters :: ImageQueryParameters
-initialImageQueryParameters = ImageQueryParameters 0 Nothing Nothing 0 0
+initialImageQueryParameters = ImageQueryParameters Red Nothing Nothing 0 0
 
 outputToResult :: ImageQueryOutput -> ImageQueryResult
 outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]}
@@ -91,12 +96,12 @@ outputToResult (AverageImage averageimage) = mempty {_averageImages = [averageim
 outputToResult (TableValue tablevalue) = mempty {_tableRow = [tablevalue]}
 outputToResult (ImageLine imageline) = mempty {_imageLines = [imageline]}
 
-runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image Word8 -> m ImageQueryResult
+runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image RGB -> m ImageQueryResult
 runImageQueries imagequerystatements image = flip evalStateT initialImageQueryParameters (do
     imagequeryoutputs <- forM imagequerystatements (runImageQuery image)
     return (foldMap outputToResult (catMaybes imagequeryoutputs)))
 
-runImageQuery :: (Monad m) => Image Word8 -> ImageQueryStatement -> StateT ImageQueryParameters m (Maybe ImageQueryOutput)
+runImageQuery :: (Monad m) => Image RGB -> ImageQueryStatement -> StateT ImageQueryParameters m (Maybe ImageQueryOutput)
 runImageQuery _ (SetImageQueryParameter imagequeryparameter) = do
     setImageQueryParameter imagequeryparameter
     return Nothing
@@ -116,13 +121,20 @@ setImageQueryParameter (Threshold threshold) =
 setImageQueryParameter (Smoothing smoothing) =
     modify (\imagequeryparameters -> imagequeryparameters {_smoothing = smoothing})
 
-getImageQueryOutput :: Image Word8 -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
-getImageQueryOutput image imagequeryparameters (TableQuery tablequery) = runTableQuery image imagequeryparameters tablequery
-getImageQueryOutput image _ ImageOfAverage = AverageImage image
-getImageQueryOutput image _ (LineImage Horizontal x y l) = ImageLine (horizontalLine x y l image)
-getImageQueryOutput image _ (LineImage Vertical x y l) = ImageLine (verticalLine x y l image)
-getImageQueryOutput image imagequeryparameters (IslandImage polarity) =
-    OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters image))
+getImageQueryOutput :: Image RGB -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
+getImageQueryOutput image imagequeryparameters imagequery =
+    let channel = case _channel imagequeryparameters of
+            Red -> red
+            Green -> green
+            Blue -> blue
+        grayimage = chooseChannel channel image
+    in case imagequery of
+        TableQuery tablequery -> runTableQuery grayimage imagequeryparameters tablequery
+        ImageOfAverage -> AverageImage grayimage
+        LineImage Horizontal x y l -> ImageLine (horizontalLine x y l grayimage)
+        LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
+        IslandImage polarity ->
+            OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters grayimage))
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
@@ -139,8 +151,8 @@ runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
     numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
 
 prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
-prepareIslandImage polarity imagequeryparameters image = cutimage where
-    binaryimage = binarize (_threshold imagequeryparameters) image
+prepareIslandImage polarity imagequeryparameters grayimage = cutimage where
+    binaryimage = binarize (_threshold imagequeryparameters) grayimage
     invertedimage = case polarity of
         Bright -> binaryimage
         Dark -> invert binaryimage

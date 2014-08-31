@@ -7,7 +7,8 @@ import ImageQuery (
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
-    Orientation(Horizontal,Vertical))
+    Orientation(Horizontal,Vertical),
+    Channel(Red,Green,Blue))
 import Text.Parsec (
     sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>),manyTill,anyChar)
 import Text.Parsec.String (Parser)
@@ -38,8 +39,8 @@ channelParser :: Parser ImageQueryParameter
 channelParser = do
     string "set_channel"
     spaces
-    channelstring <- digits
-    return (Channel (read channelstring))
+    channeltype <- channelTypeParser
+    return (Channel channeltype)
 
 smoothingParser :: Parser ImageQueryParameter
 smoothingParser = do
@@ -155,6 +156,12 @@ orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vert
 
 polarityParser :: Parser Polarity
 polarityParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
+
+channelTypeParser :: Parser Channel
+channelTypeParser =
+    (string "red" >> return Red) <|>
+    (string "green" >> return Green) <|>
+    (string "blue" >> return Blue)
 
 digits :: Parser String
 digits = many1 digit

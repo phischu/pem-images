@@ -1,21 +1,19 @@
 module ImageLoading where
 
-import ImageProcessing (Image,juicyToImage)
+import ImageProcessing (Image,RGB,juicyToImage)
 
 import Pipes
 import qualified Pipes.Prelude as Pipes
 
-import qualified Codec.Picture as Juicy (Image,Pixel8,PixelRGB8,PixelYCbCr8)
+import qualified Codec.Picture as Juicy (Image,PixelRGB8)
 import Codec.Picture (readImage,DynamicImage(ImageRGB8,ImageY8,ImageYCbCr8))
-import Codec.Picture.Types (extractComponent,PlaneRed(PlaneRed),PlaneLuma(PlaneLuma))
-
-import Data.Word (Word8)
+import Codec.Picture.Types (promoteImage,convertImage)
 
 import System.Directory
 import System.FilePath
 import Control.Error
 
-imageSeries :: (MonadIO m) => FilePath -> Producer (Image Word8) (EitherT ImageLoadingError m) ()
+imageSeries :: (MonadIO m) => FilePath -> Producer (Image RGB) (EitherT ImageLoadingError m) ()
 imageSeries seriespath =
     filesInDirectory seriespath >->
     Pipes.mapM loadImage >->
@@ -30,18 +28,13 @@ filesInDirectory directorypath = do
     directorycontents <- liftIO (getDirectoryContents directorypath)
     each directorycontents >-> Pipes.map (directorypath </>) >-> Pipes.filterM (liftIO . doesFileExist)
 
-loadImage :: (MonadIO m) => FilePath -> EitherT ImageLoadingError m (Juicy.Image Juicy.Pixel8)
+loadImage :: (MonadIO m) => FilePath -> EitherT ImageLoadingError m (Juicy.Image Juicy.PixelRGB8)
 loadImage imagepath = do
     eitherdynamicimage <- liftIO (readImage imagepath)
     case eitherdynamicimage of
         Left readimageerror -> left (ReadImageError readimageerror)
-        Right (ImageRGB8 image) -> return (chooseRedChannel image)
-        Right (ImageY8 image) -> return image
-        Right (ImageYCbCr8 image) -> return (chooseYChannel image )
+        Right (ImageRGB8 image) -> return image
+        Right (ImageY8 image) -> return (promoteImage image)
+        Right (ImageYCbCr8 image) -> return (convertImage image)
         _ -> left ImageFormatError
 
-chooseRedChannel :: Juicy.Image Juicy.PixelRGB8 -> Juicy.Image Juicy.Pixel8
-chooseRedChannel = extractComponent PlaneRed
-
-chooseYChannel :: Juicy.Image Juicy.PixelYCbCr8 -> Juicy.Image Juicy.Pixel8
-chooseYChannel = extractComponent PlaneLuma

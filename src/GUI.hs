@@ -6,13 +6,14 @@ import ImageQuery (
     ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
+    Channel(Red,Green,Blue),
     ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import ImageLoading (loadImage)
-import ImageProcessing (juicyToImage,binarize)
+import ImageProcessing (juicyToImage,binarize,chooseChannel,RGB(red))
 import Text.Parsec.String (parseFromFile)
 
 import Graphics.UI.WX (
@@ -325,7 +326,11 @@ channelControl = StatementControl "Channel" (\parentPanel -> do
     channelChoice <- choice parentPanel [items := ["Red","Green","Blue"],selection := 0]
     let getStatement = do
             channelSelection <- Wx.get channelChoice selection
-            return (SetImageQueryParameter (Channel channelSelection))
+            let channelType = case channelSelection of
+                    0 -> Red
+                    1 -> Green
+                    2 -> Blue
+            return (SetImageQueryParameter (Channel channelType))
     return ([widget channelChoice],getStatement))
 
 subrectControl :: StatementControl
@@ -351,7 +356,7 @@ stencilControl = StatementControl "Stencil" (\parentPanel -> do
                         Right juicyImage ->
                             return (SetImageQueryParameter (
                                 StencilImage filepath (Just (
-                                    binarize 0 (juicyToImage juicyImage)))))
+                                    binarize 0 (chooseChannel red (juicyToImage juicyImage))))))
     return ([],getStatement))
 
 thresholdControl :: StatementControl

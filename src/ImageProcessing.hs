@@ -14,7 +14,7 @@ import qualified Data.Array.Repa.Repr.Delayed as Repa (
     fromFunction)
 
 import qualified Codec.Picture as Juicy (
-    Image,Pixel8,pixelAt,imageHeight,imageWidth,generateImage)
+    Image,Pixel8,PixelRGB8(PixelRGB8),pixelAt,imageHeight,imageWidth,generateImage)
 
 import Data.Word (Word8)
 
@@ -37,13 +37,19 @@ import Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length)
 
 type Image a = Repa.Array D DIM2 a
+data RGB = RGB {
+    red :: Word8,
+    green :: Word8,
+    blue :: Word8}
 type Rect = (Int,Int,Int,Int)
 
-juicyToImage :: Juicy.Image Juicy.Pixel8 -> Image Word8
-juicyToImage juicy = Repa.delay (Repa.computeUnboxedS (Repa.fromFunction shape (\(Z:.y:.x) -> Juicy.pixelAt juicy x y))) where
-    shape = Z:.h:.w
-    w = Juicy.imageWidth juicy
-    h = Juicy.imageHeight juicy
+juicyToImage :: Juicy.Image Juicy.PixelRGB8 -> Image RGB
+juicyToImage juicy = Repa.delay (
+    Repa.fromFunction shape (\(Z:.y:.x) -> case Juicy.pixelAt juicy x y of
+            Juicy.PixelRGB8 r g b -> RGB r g b)) where
+        shape = Z:.h:.w
+        w = Juicy.imageWidth juicy
+        h = Juicy.imageHeight juicy
 
 imageToJuicy :: Image Word8 -> Juicy.Image Juicy.Pixel8
 imageToJuicy image = Juicy.generateImage (\x y -> index image (Z:.y:.x)) w h where
@@ -65,6 +71,9 @@ applyStencil stencil image = Repa.delay (Repa.computeUnboxedS (Repa.zipWith (&&)
 
 invert :: Image Bool -> Image Bool
 invert image = Repa.map not image
+
+chooseChannel :: (RGB -> Word8) -> Image RGB -> Image Word8
+chooseChannel channel = Repa.delay . Repa.computeUnboxedS . Repa.map channel
 
 type Threshold = Word8
 
