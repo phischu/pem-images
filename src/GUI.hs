@@ -35,7 +35,7 @@ import MVC (
 import Pipes (await,yield)
 import Control.Monad.State.Class (get,put,gets)
 
-import Control.Monad (forever,replicateM,forM)
+import Control.Monad (forever,replicateM,forM,when)
 import Control.Error (runEitherT)
 import Data.Monoid (mconcat)
 
@@ -48,7 +48,8 @@ data Request =
     RequestLoadProgram [ImageQueryStatement] |
     RequestRunProgram |
     RequestAddStatement Int ImageQueryStatement |
-    RequestInputPath InputPath
+    RequestInputPath InputPath |
+    RequestDeleteStatement Int
 
 data Response =
     ResponseSaveProgram FilePath [ImageQueryStatement] |
@@ -85,7 +86,16 @@ model = asPipe (forever (do
         RequestInputPath inputpath -> do
             program <- get
             put (program {inputPath = inputpath})
-            yield (ResponseInputPath inputpath)))
+            yield (ResponseInputPath inputpath)
+        RequestDeleteStatement index -> do
+            imagequerystatements <- gets imageQueryStatements
+            inputpath <- gets inputPath
+            when (index < length imagequerystatements) (do
+                let (prefix,suffix) = splitAt index imagequerystatements
+                    imagequerystatements' = prefix ++ tail suffix
+                put (Program imagequerystatements' inputpath)
+                yield (ResponseProgramChanged imagequerystatements'))))
+
 
 wx :: Managed (View Response,Controller Request)
 wx = managed (\k -> do
@@ -97,22 +107,25 @@ wx = managed (\k -> do
     (programChangedO,programChangedI)     <- spawn Single
     (changeInputPathO,changeInputPathI)   <- spawn Single
     (inputPathChangedO,inputPathChangedI) <- spawn Single
+    (deleteStatementO,deleteStatementI)   <- spawn Single
 
     forkIO (start (do
 
-        parentFrame       <- frame [text := "Image Processing",position := pt 100 100]
-        saveProgramButton <- createSaveProgramButton parentFrame saveProgramO
-        loadProgramButton <- createLoadProgramButton parentFrame loadProgramO
-        runProgramButton  <- createRunProgramButton parentFrame runProgramO
-        programListBox    <- createProgramListBox parentFrame programChangedI
-        addStatementPanel <- createAddStatementPanel programListBox parentFrame addStatementO
-        inputPathButton   <- createInputPathButton parentFrame changeInputPathO
-        inputPathText     <- createInputPathText parentFrame inputPathChangedI
+        parentFrame           <- frame [text := "Image Processing",position := pt 100 100]
+        saveProgramButton     <- createSaveProgramButton parentFrame saveProgramO
+        loadProgramButton     <- createLoadProgramButton parentFrame loadProgramO
+        runProgramButton      <- createRunProgramButton parentFrame runProgramO
+        programListBox        <- createProgramListBox parentFrame programChangedI
+        addStatementPanel     <- createAddStatementPanel programListBox parentFrame addStatementO
+        inputPathButton       <- createInputPathButton parentFrame changeInputPathO
+        inputPathText         <- createInputPathText parentFrame inputPathChangedI
+        deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
 
         let frameLayout = row 5 [
                 column 5 [
                     minsize (sz 500 500) (widget programListBox),
                     row 5 [
+                        widget deleteStatementButton,
                         widget loadProgramButton,
                         widget saveProgramButton,
                         widget runProgramButton]],
@@ -124,7 +137,7 @@ wx = managed (\k -> do
 
         set parentFrame [layout := frameLayout]))
 
-    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI]
+    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI,deleteStatementI]
 
         sink (ResponseSaveProgram filepath imagequerystatements) = do
             writeFile filepath (imageQueriesPrinter imagequerystatements)
@@ -191,6 +204,14 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
     attributes = [text := "Run", on command := sendRunProgramRequest]
     sendRunProgramRequest = do
         atomically (send runProgramO RequestRunProgram)
+        return ()
+
+createDeleteStatementButton :: SingleListBox () -> Frame () -> Output Request -> IO (Button ())
+createDeleteStatementButton programListBox parentFrame deleteStatementO = button parentFrame attributes where
+    attributes = [text := "Delete statement", on command := sendDeleteStatementRequest]
+    sendDeleteStatementRequest = do
+        index <- Wx.get programListBox selection
+        atomically (send deleteStatementO (RequestDeleteStatement index))
         return ()
 
 createInputPathButton :: Frame () -> Output Request -> IO (Button ())
