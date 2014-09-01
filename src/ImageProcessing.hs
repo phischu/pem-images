@@ -77,6 +77,19 @@ chooseChannel channel = Repa.delay . Repa.computeUnboxedS . Repa.map channel
 
 type Threshold = Word8
 
+smooth :: Int -> Image Word8 -> Image Word8
+smooth 0 = id
+smooth radius = Repa.map (fromIntegral . (`div` size)) . Repa.map sumPixels . neighbourhood radius where
+    size = width * width
+    width = 2 * fromIntegral radius + 1
+
+neighbourhood :: Int -> Image Word8 -> Image (Image Word8)
+neighbourhood r image = Repa.traverse image id f where
+    f a (Z:.y:.x) = Repa.fromFunction (Z:.2*r+1:.2*r+1) (\(Z:.j:.i) -> a (Z :. y + r - j :. x + r - i))
+
+sumPixels :: Image Word8 -> Int
+sumPixels = Repa.sumAllS . Repa.map fromIntegral
+
 valueInPoint :: (Num a) => Int -> Int -> Image a -> a
 valueInPoint x y image = withDefault (extent image) 0 (index image) (Z:.y:.x)
 

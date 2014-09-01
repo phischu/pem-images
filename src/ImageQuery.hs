@@ -3,7 +3,7 @@ module ImageQuery where
 import ImageProcessing (
     Image,Rect,Threshold,RGB(red,green,blue),
     valueInPoint,averageAroundPoint,averageOfImage,
-    cutOut,binarize,applyStencil,invert,blackAndWhite,chooseChannel,
+    cutOut,binarize,applyStencil,invert,blackAndWhite,chooseChannel,smooth,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
     horizontalLine,verticalLine)
 
@@ -152,7 +152,8 @@ runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
 
 prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
 prepareIslandImage polarity imagequeryparameters grayimage = cutimage where
-    binaryimage = binarize (_threshold imagequeryparameters) grayimage
+    smoothedimage = smooth (_smoothing imagequeryparameters) grayimage
+    binaryimage = binarize (_threshold imagequeryparameters) smoothedimage
     invertedimage = case polarity of
         Bright -> binaryimage
         Dark -> invert binaryimage
