@@ -28,8 +28,8 @@ import Graphics.UI.WX (
 import qualified  Graphics.UI.WX as Wx (get,set)
 
 import MVC (
-    runMVC,Model,View,Controller,asPipe,
-    Managed,managed,asSink,asInput,
+    runMVC,Model,asPipe,
+    managed,asSink,asInput,
     spawn,Buffer(Single),atomically,forkIO,
     Output,send,
     Input,recv)
@@ -59,9 +59,6 @@ data Response =
     ResponseInputPath InputPath
 
 type InputPath = FilePath
-
-gui :: IO ()
-gui = runMVC (Program [] ".") model wx >> return ()
 
 model :: Model Program Request Response
 model = asPipe (forever (do
@@ -97,9 +94,8 @@ model = asPipe (forever (do
                 put (Program imagequerystatements' inputpath)
                 yield (ResponseProgramChanged imagequerystatements'))))
 
-
-wx :: Managed (View Response,Controller Request)
-wx = managed (\k -> do
+gui :: IO ()
+gui = start (do
 
     (saveProgramO,saveProgramI)           <- spawn Single
     (loadProgramO,loadProgramI)           <- spawn Single
@@ -110,49 +106,51 @@ wx = managed (\k -> do
     (inputPathChangedO,inputPathChangedI) <- spawn Single
     (deleteStatementO,deleteStatementI)   <- spawn Single
 
-    forkIO (start (do
+    parentFrame           <- frame [text := "Image Processing",position := pt 100 100]
+    saveProgramButton     <- createSaveProgramButton parentFrame saveProgramO
+    loadProgramButton     <- createLoadProgramButton parentFrame loadProgramO
+    runProgramButton      <- createRunProgramButton parentFrame runProgramO
+    programListBox        <- createProgramListBox parentFrame programChangedI
+    addStatementPanel     <- createAddStatementPanel programListBox parentFrame addStatementO
+    inputPathButton       <- createInputPathButton parentFrame changeInputPathO
+    inputPathText         <- createInputPathText parentFrame inputPathChangedI
+    deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
 
-        parentFrame           <- frame [text := "Image Processing",position := pt 100 100]
-        saveProgramButton     <- createSaveProgramButton parentFrame saveProgramO
-        loadProgramButton     <- createLoadProgramButton parentFrame loadProgramO
-        runProgramButton      <- createRunProgramButton parentFrame runProgramO
-        programListBox        <- createProgramListBox parentFrame programChangedI
-        addStatementPanel     <- createAddStatementPanel programListBox parentFrame addStatementO
-        inputPathButton       <- createInputPathButton parentFrame changeInputPathO
-        inputPathText         <- createInputPathText parentFrame inputPathChangedI
-        deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
+    let wx = managed (\k -> let
 
-        let frameLayout = row 5 [
-                column 5 [
-                    minsize (sz 500 500) (widget programListBox),
-                    row 5 [
-                        widget deleteStatementButton,
-                        widget loadProgramButton,
-                        widget saveProgramButton,
-                        widget runProgramButton]],
-                column 5 [
-                    widget addStatementPanel,
-                    boxed "Inputs" (row 5 [
-                        widget inputPathButton,
-                        widget inputPathText])]]
+            inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI,deleteStatementI]
 
-        set parentFrame [layout := frameLayout]))
+            sink (ResponseSaveProgram filepath imagequerystatements) = do
+                writeFile filepath (imageQueriesPrinter imagequerystatements)
+            sink (ResponseProgramChanged imagequerystatements) = do
+                atomically (send programChangedO imagequerystatements)
+                return ()
+            sink (ResponseRunProgram inputpath imagequerystatements) = do
+                result <- run inputpath imagequerystatements
+                putStrLn (either id (const "Run finished!") result)
+            sink (ResponseInputPath inputpath) = do
+                atomically (send inputPathChangedO inputpath)
+                return ()
 
-    let inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI,deleteStatementI]
+            in k (asSink sink,asInput (mconcat inputs)))
 
-        sink (ResponseSaveProgram filepath imagequerystatements) = do
-            writeFile filepath (imageQueriesPrinter imagequerystatements)
-        sink (ResponseProgramChanged imagequerystatements) = do
-            atomically (send programChangedO imagequerystatements)
-            return ()
-        sink (ResponseRunProgram inputpath imagequerystatements) = do
-            result <- run inputpath imagequerystatements
-            putStrLn (either id (const "Run finished!") result)
-        sink (ResponseInputPath inputpath) = do
-            atomically (send inputPathChangedO inputpath)
-            return ()
+        frameLayout = row 5 [
+            column 5 [
+                minsize (sz 500 500) (widget programListBox),
+                row 5 [
+                    widget deleteStatementButton,
+                    widget loadProgramButton,
+                    widget saveProgramButton,
+                    widget runProgramButton]],
+            column 5 [
+                widget addStatementPanel,
+                boxed "Inputs" (row 5 [
+                    widget inputPathButton,
+                    widget inputPathText])]]
 
-    k (asSink sink,asInput (mconcat inputs)))
+    forkIO (runMVC (Program [] ".") model wx >> return ())
+
+    set parentFrame [layout := frameLayout])
 
 createSaveProgramButton :: Frame () -> Output Request -> IO (Button ())
 createSaveProgramButton parentFrame saveProgramO = button parentFrame attributes where
