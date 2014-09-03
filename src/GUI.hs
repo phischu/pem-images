@@ -173,7 +173,7 @@ createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes
     sendLoadProgramRequest = do
         maybeFilepath <- fileOpenDialog
             parentFrame True True "Load Image Queries"
-            [("Image Query File",["*.imagequery"])] "" ""
+            [("Image Query File",["*.imagequery"]),("All Files",["*"])] "" ""
         case maybeFilepath of
             Nothing -> return ()
             Just filepath -> do
