@@ -75,23 +75,26 @@ data ImageQueryOutput =
     OutputImage (Image Word8) |
     AverageImage (Image Word8) |
     TableValue Double |
-    ImageLine (Unboxed.Vector Word8)
+    ImageLine (Unboxed.Vector Word8) |
+    Histogram (Unboxed.Vector Int) (Unboxed.Vector Int)
 
 data ImageQueryResult = ImageQueryResult {
     _outputImages :: [Image Word8],
     _averageImages :: [Image Word8],
     _tableRow :: [Double],
-    _imageLines :: [Unboxed.Vector Word8]}
+    _imageLines :: [Unboxed.Vector Word8],
+    _histograms :: [(Unboxed.Vector Int,Unboxed.Vector Int)]}
 
 instance Monoid ImageQueryResult where
-    mempty = ImageQueryResult [] [] [] []
+    mempty = ImageQueryResult [] [] [] [] []
     mappend
-        (ImageQueryResult outputimages1 averageimages1 tablerow1 imagelines1)
-        (ImageQueryResult outputimages2 averageimages2 tablerow2 imagelines2) = ImageQueryResult
+        (ImageQueryResult outputimages1 averageimages1 tablerow1 imagelines1 histograms1)
+        (ImageQueryResult outputimages2 averageimages2 tablerow2 imagelines2 histograms2) = ImageQueryResult
             (mappend outputimages1 outputimages2)
             (mappend averageimages1 averageimages2)
             (mappend tablerow1 tablerow2)
             (mappend imagelines1 imagelines2)
+            (mappend histograms1 histograms2)
 
 initialImageQueryParameters :: ImageQueryParameters
 initialImageQueryParameters = ImageQueryParameters Red Nothing Nothing 0 0
@@ -101,6 +104,7 @@ outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]
 outputToResult (AverageImage averageimage) = mempty {_averageImages = [averageimage]}
 outputToResult (TableValue tablevalue) = mempty {_tableRow = [tablevalue]}
 outputToResult (ImageLine imageline) = mempty {_imageLines = [imageline]}
+outputToResult (Histogram keys values) = mempty {_histograms = [(keys,values)]}
 
 runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image RGB -> m ImageQueryResult
 runImageQueries imagequerystatements image = flip evalStateT initialImageQueryParameters (do
@@ -141,6 +145,8 @@ getImageQueryOutput image imagequeryparameters imagequery =
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
         IslandImage polarity ->
             OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters grayimage))
+        AreaHistogram polarity bins binsize power ->
+            Histogram undefined undefined
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
