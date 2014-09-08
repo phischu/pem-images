@@ -3,12 +3,13 @@ module ImageQuery.Parser where
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
     ImageQueryParameter(Threshold,Channel,Smoothing,SubRect,StencilImage),
-    ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage),
+    ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage,AreaHistogram),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
     Orientation(Horizontal,Vertical),
-    Channel(Red,Green,Blue))
+    Channel(Red,Green,Blue),
+    Power(One,OneOverTwo,ThreeOverTwo))
 import Text.Parsec (
     sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>),manyTill,anyChar)
 import Text.Parsec.String (Parser)
@@ -151,6 +152,19 @@ lineImageParser = do
     lstring <- digits
     return (LineImage orientation (read xstring) (read ystring) (read lstring))
 
+areaHistogramParser :: Parser ImageQuery
+areaHistogramParser = do
+    string "output_area_histogram"
+    spaces
+    polarity <- polarityParser
+    spaces
+    bins <- digits
+    spaces
+    binsize <- digits
+    spaces
+    power <- powerParser
+    return (AreaHistogram polarity (read bins) (read binsize) power)
+
 orientationParser :: Parser Orientation
 orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vertical" >> return Vertical)
 
@@ -162,6 +176,12 @@ channelTypeParser =
     (string "red" >> return Red) <|>
     (string "green" >> return Green) <|>
     (string "blue" >> return Blue)
+
+powerParser :: Parser Power
+powerParser =
+    (string "one" >> return One) <|>
+    (string "one_over_two" >> return OneOverTwo) <|>
+    (string "three_over_two" >> return ThreeOverTwo)
 
 digits :: Parser String
 digits = many1 digit

@@ -25,7 +25,8 @@ data ImageQuery =
     TableQuery TableQuery |
     ImageOfAverage |
     LineImage Orientation Int Int Int |
-    IslandImage Polarity deriving Show
+    IslandImage Polarity |
+    AreaHistogram Polarity Int Int Power deriving Show
 
 data ImageQueryParameter =
     Channel Channel |
@@ -57,6 +58,11 @@ data Channel =
     Red |
     Green |
     Blue deriving Show
+
+data Power =
+    One |
+    OneOverTwo |
+    ThreeOverTwo deriving Show
 
 data ImageQueryParameters = ImageQueryParameters {
     _channel :: Channel,
