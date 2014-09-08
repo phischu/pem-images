@@ -16,7 +16,8 @@ import Data.Foldable (foldMap)
 
 import Data.Word (Word8)
 
-import qualified Data.Vector.Unboxed as Unboxed (Vector,toList)
+import qualified Data.Vector.Unboxed as Unboxed (Vector)
+import qualified Data.Array as Array (elems)
 
 data ImageQueryStatement =
     SetImageQueryParameter ImageQueryParameter |
@@ -152,7 +153,7 @@ getImageQueryOutput image imagequeryparameters imagequery =
                     One -> id
                     OneOverTwo -> round . (sqrt :: Double -> Double) . fromIntegral
                     ThreeOverTwo -> round . (^(3 :: Int)) . (sqrt :: Double -> Double) . fromIntegral
-            in Histogram binsize (Unboxed.toList (areaHistogram bins binsize powerFunction islandImage))
+            in Histogram binsize (Array.elems (areaHistogram bins binsize powerFunction islandImage))
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))

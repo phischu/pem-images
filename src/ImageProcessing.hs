@@ -168,8 +168,9 @@ finalizeAverageImage (Just image) n
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
 
-areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> Vector Int
-areaHistogram = undefined
+areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> Array Int Int
+areaHistogram bins _ _ _ = runSTArray (do
+    newArray_ (0,bins - 1))
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do
