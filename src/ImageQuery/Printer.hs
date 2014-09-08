@@ -3,12 +3,13 @@ module ImageQuery.Printer where
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
     ImageQueryParameter(Threshold,Channel,Smoothing,SubRect,StencilImage),
-    ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage),
+    ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage,AreaHistogram),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Polarity(Bright,Dark),
     Orientation(Horizontal,Vertical),
-    Channel(Red,Green,Blue))
+    Channel(Red,Green,Blue),
+    Power(One,OneOverTwo,ThreeOverTwo))
 
 type Printer a = a -> String
 
@@ -34,6 +35,13 @@ imageQueryPrinter ImageOfAverage = "output_average_image"
 imageQueryPrinter (LineImage orientation x y l) =
     "output_line_image " ++ orientationPrinter orientation ++ " " ++ numbersPrinter [x,y,l]
 imageQueryPrinter (IslandImage polarity) = "output_island_images " ++ polarityPrinter polarity
+imageQueryPrinter (AreaHistogram polarity bins binsize power) = unwords [
+    "output_area_histogram",
+    polarityPrinter polarity,
+    show bins,
+    show binsize,
+    powerPrinter power]
+
 
 tableQueryPrinter :: Printer TableQuery
 tableQueryPrinter (ValueInPoint x y) = "table_value_in_point " ++ numbersPrinter [x,y]
@@ -61,4 +69,9 @@ channelPrinter :: Printer Channel
 channelPrinter Red = "red"
 channelPrinter Green = "green"
 channelPrinter Blue = "blue"
+
+powerPrinter :: Printer Power
+powerPrinter One = "one"
+powerPrinter OneOverTwo = "one_over_two"
+powerPrinter ThreeOverTwo = "three_over_two"
 
