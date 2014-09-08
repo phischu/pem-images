@@ -4,7 +4,7 @@ import ImageLoading (
     imageSeries)
 import ImageQuery (
     ImageQueryStatement,runImageQueries,
-    ImageQueryResult(_averageImages,_imageLines,_outputImages,_tableRow))
+    ImageQueryResult(_averageImages,_imageLines,_outputImages,_tableRow,_histograms))
 import ImageProcessing (
     Image,imageToJuicy,
     singleAverageImage,addImage,finalizeAverageImage,
@@ -32,6 +32,7 @@ run :: FilePath -> [ImageQueryStatement] -> IO (Either String ())
 run inputdirectory imagequerystatements = runEitherT (do
     scriptIO (createDirectoryIfMissing True "result")
     scriptIO (createDirectoryIfMissing True ("result" </> "intermediateimages"))
+    scriptIO (createDirectoryIfMissing True ("result" </> "histograms"))
     tablehandle <- scriptIO (openFile csvResultPath WriteMode)
     runEffect (
         imageSeries inputdirectory >->
@@ -62,7 +63,8 @@ consumeResults tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
         saveIntermediateImages n (_outputImages imagequeryresult)
         saveTableRow tablehandle (_tableRow imagequeryresult)
         saveAverageImage (finalizeAverageImage maybeaverageimage' n')
-        maybe (return ()) saveLineImages maybelineimages')))
+        maybe (return ()) saveLineImages maybelineimages'
+        saveHistograms (_histograms imagequeryresult))))
 
 saveIntermediateImages :: Int -> [Image Pixel8] -> IO ()
 saveIntermediateImages n outputimages = forM_ (zip [0..] outputimages) (\(i,image) -> do
@@ -93,6 +95,13 @@ saveLineImages lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
 lineImagePath :: Int -> FilePath
 lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
+saveHistograms :: [(Int,[Int])] -> IO ()
+saveHistograms histograms = forM_ (zip [0..] histograms) (\(i,(binsize,values)) -> do
+    let histogramRow r v = show r ++ " " ++ show v
+    writeFile (histogramPath i) (unlines (zipWith histogramRow [0,binsize..] values)))
+
+histogramPath :: Int -> FilePath
+histogramPath i = "result" </> "histogram-" ++ show i ++ ".csv"
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
