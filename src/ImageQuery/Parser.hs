@@ -125,7 +125,8 @@ outputParser :: Parser ImageQueryStatement
 outputParser = choice (map try (map (fmap GetImageQueryResult) [
     islandImagesParser,
     averageImageParser,
-    lineImageParser]))
+    lineImageParser,
+    areaHistogramParser]))
 
 islandImagesParser :: Parser ImageQuery
 islandImagesParser = do
