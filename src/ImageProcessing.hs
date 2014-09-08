@@ -70,7 +70,7 @@ applyStencil stencil image = Repa.delay (Repa.computeUnboxedS (Repa.zipWith (&&)
     indexInShape position = if inShape shape position then Just position else Nothing
 
 invert :: Image Bool -> Image Bool
-invert image = Repa.map not image
+invert image = Repa.map not image 
 
 chooseChannel :: (RGB -> Word8) -> Image RGB -> Image Word8
 chooseChannel channel = Repa.delay . Repa.computeUnboxedS . Repa.map channel
@@ -167,6 +167,9 @@ finalizeAverageImage (Just image) n
     | n <= 0 = Nothing
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
+
+areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> Vector Int
+areaHistogram = undefined
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do

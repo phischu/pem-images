@@ -5,7 +5,8 @@ import ImageProcessing (
     valueInPoint,averageAroundPoint,averageOfImage,
     cutOut,binarize,applyStencil,invert,blackAndWhite,chooseChannel,smooth,
     numberOfIslands,numberOfTruePixels,numberOfOutlinePixels,
-    horizontalLine,verticalLine)
+    horizontalLine,verticalLine,
+    areaHistogram)
 
 import Control.Monad.Trans.State.Strict (StateT,evalStateT,get,modify)
 import Data.Monoid (Monoid(..))
@@ -15,7 +16,7 @@ import Data.Foldable (foldMap)
 
 import Data.Word (Word8)
 
-import qualified Data.Vector.Unboxed as Unboxed (Vector)
+import qualified Data.Vector.Unboxed as Unboxed (Vector,toList)
 
 data ImageQueryStatement =
     SetImageQueryParameter ImageQueryParameter |
@@ -145,8 +146,13 @@ getImageQueryOutput image imagequeryparameters imagequery =
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
         IslandImage polarity ->
             OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters grayimage))
-        AreaHistogram _ _ _ _ ->
-            Histogram undefined undefined
+        AreaHistogram polarity bins binsize power ->
+            let islandImage = prepareIslandImage polarity imagequeryparameters grayimage
+                powerFunction = case power of
+                    One -> id
+                    OneOverTwo -> round . (sqrt :: Double -> Double) . fromIntegral
+                    ThreeOverTwo -> round . (^(3 :: Int)) . (sqrt :: Double -> Double) . fromIntegral
+            in Histogram binsize (Unboxed.toList (areaHistogram bins binsize powerFunction islandImage))
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
 runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
