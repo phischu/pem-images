@@ -76,14 +76,14 @@ data ImageQueryOutput =
     AverageImage (Image Word8) |
     TableValue Double |
     ImageLine (Unboxed.Vector Word8) |
-    Histogram (Unboxed.Vector Int) (Unboxed.Vector Int)
+    Histogram Int (Unboxed.Vector Int)
 
 data ImageQueryResult = ImageQueryResult {
     _outputImages :: [Image Word8],
     _averageImages :: [Image Word8],
     _tableRow :: [Double],
     _imageLines :: [Unboxed.Vector Word8],
-    _histograms :: [(Unboxed.Vector Int,Unboxed.Vector Int)]}
+    _histograms :: [(Int,Unboxed.Vector Int)]}
 
 instance Monoid ImageQueryResult where
     mempty = ImageQueryResult [] [] [] [] []
@@ -145,7 +145,7 @@ getImageQueryOutput image imagequeryparameters imagequery =
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
         IslandImage polarity ->
             OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters grayimage))
-        AreaHistogram polarity bins binsize power ->
+        AreaHistogram _ _ _ _ ->
             Histogram undefined undefined
 
 runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
