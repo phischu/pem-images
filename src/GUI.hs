@@ -3,13 +3,14 @@ module GUI where
 import Run (run)
 import ImageQuery (
     ImageQueryStatement(GetImageQueryResult,SetImageQueryParameter),
-    ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery),
+    ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery,AreaHistogram),
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
     Channel(Red,Green,Blue),
     ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
-    IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands))
+    IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
+    Power(One,OneOverTwo,ThreeOverTwo))
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import ImageLoading (loadImage)
@@ -255,6 +256,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     averageImagePanel       <- createStatementPanel averageImageControl
     islandImagePanel        <- createStatementPanel islandImageControl
     lineImagePanel          <- createStatementPanel lineImageControl
+    areaHistogramPanel      <- createStatementPanel areaHistogramControl
     channelPanel            <- createStatementPanel channelControl
     subrectPanel            <- createStatementPanel subrectControl
     stencilPanel            <- createStatementPanel stencilControl
@@ -272,10 +274,11 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
             widget stencilPanel,
             widget thresholdPanel,
             widget smoothingPanel]),
-        boxed "Output Image" (column 5 [
+        boxed "Output" (column 5 [
             widget averageImagePanel,
             widget islandImagePanel,
-            widget lineImagePanel]),
+            widget lineImagePanel,
+            widget areaHistogramPanel]),
         boxed "Table Entry" (column 5 [
             widget valueInPointPanel,
             widget averageAroundPointPanel,
@@ -317,6 +320,28 @@ lineImageControl = StatementControl "Line Image" (\parentPanel -> do
                 l = read lText
             return (GetImageQueryResult (LineImage orientation x y l))
         layouts = [widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]
+    return (layouts,getStatement))
+
+areaHistogramControl :: StatementControl
+areaHistogramControl = StatementControl "Area Histogram" (\parentPanel -> do
+    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
+    binsEntry <- entry parentPanel [text := "1"]
+    binsizeEntry <- entry parentPanel [text := "1"]
+    powerChoice <- choice parentPanel [items := ["One","One over two","Three over two"],selection := 0]
+    let getStatement = do
+            polaritySelection <- Wx.get polarityChoice selection
+            binsText <- Wx.get binsEntry text
+            binsizeText <- Wx.get binsizeEntry text
+            powerSelection <- Wx.get powerChoice selection
+            let polarity = if polaritySelection == 0 then Dark else Bright
+                bins = read binsText
+                binsize = read binsizeText
+                power = case powerSelection of
+                    0 -> One
+                    1 -> OneOverTwo
+                    2 -> ThreeOverTwo
+            return (GetImageQueryResult (AreaHistogram polarity bins binsize power))
+        layouts = [widget polarityChoice,widget binsEntry,widget binsizeEntry,widget powerChoice]
     return (layouts,getStatement))
 
 channelControl :: StatementControl
