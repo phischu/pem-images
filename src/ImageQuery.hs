@@ -27,21 +27,22 @@ data ImageQuery =
     TableQuery TableQuery |
     ImageOfAverage |
     LineImage Orientation Int Int Int |
-    IslandImage Polarity |
-    AreaHistogram Polarity Int Int Power deriving Show
+    IslandImage |
+    AreaHistogram Int Int Power deriving Show
 
 data ImageQueryParameter =
     Channel Channel |
     SubRect Rect |
     StencilImage FilePath (Maybe (Image Bool)) |
     Threshold Threshold |
-    Smoothing Int
+    Smoothing Int |
+    Polarity Polarity
 
 data TableQuery =
     ValueInPoint Int Int |
     AverageAroundPoint Int Int Int |
     AverageOfImage |
-    IslandQuery Polarity IslandQuery deriving Show
+    IslandQuery IslandQuery deriving Show
 
 data IslandQuery =
     NumberOfIslands |
@@ -71,7 +72,8 @@ data ImageQueryParameters = ImageQueryParameters {
     _subRect :: Maybe Rect,
     _stencilImage :: Maybe (Image Bool),
     _threshold :: Threshold,
-    _smoothing :: Int}
+    _smoothing :: Int,
+    _polarity :: Polarity}
 
 data ImageQueryOutput =
     OutputImage (Image Word8) |
@@ -99,7 +101,7 @@ instance Monoid ImageQueryResult where
             (mappend histograms1 histograms2)
 
 initialImageQueryParameters :: ImageQueryParameters
-initialImageQueryParameters = ImageQueryParameters Red Nothing Nothing 0 0
+initialImageQueryParameters = ImageQueryParameters Red Nothing Nothing 0 0 Dark
 
 outputToResult :: ImageQueryOutput -> ImageQueryResult
 outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]}
@@ -132,35 +134,28 @@ setImageQueryParameter (Threshold threshold) =
     modify (\imagequeryparameters -> imagequeryparameters {_threshold = threshold})
 setImageQueryParameter (Smoothing smoothing) =
     modify (\imagequeryparameters -> imagequeryparameters {_smoothing = smoothing})
+setImageQueryParameter (Polarity polarity) =
+    modify (\imagequeryparameters -> imagequeryparameters {_polarity = polarity})
 
 getImageQueryOutput :: Image RGB -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
 getImageQueryOutput image imagequeryparameters imagequery =
-    let channel = case _channel imagequeryparameters of
-            Red -> red
-            Green -> green
-            Blue -> blue
-        grayimage = chooseChannel channel image
+    let grayimage = chooseChannel (runChannel (_channel imagequeryparameters)) image
+        islandimage = prepareIslandImage imagequeryparameters grayimage
     in case imagequery of
-        TableQuery tablequery -> runTableQuery grayimage imagequeryparameters tablequery
+        TableQuery tablequery -> runTableQuery grayimage islandimage tablequery
         ImageOfAverage -> AverageImage grayimage
         LineImage Horizontal x y l -> ImageLine (horizontalLine x y l grayimage)
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
-        IslandImage polarity ->
-            OutputImage (blackAndWhite (prepareIslandImage polarity imagequeryparameters grayimage))
-        AreaHistogram polarity bins binsize power ->
-            let islandImage = prepareIslandImage polarity imagequeryparameters grayimage
-                powerFunction = case power of
-                    One -> id
-                    OneOverTwo -> round . (sqrt :: Double -> Double) . fromIntegral
-                    ThreeOverTwo -> round . (^(3 :: Int)) . (sqrt :: Double -> Double) . fromIntegral
-            in Histogram binsize (Array.elems (areaHistogram bins binsize powerFunction islandImage))
+        IslandImage -> OutputImage (blackAndWhite islandimage)
+        AreaHistogram bins binsize power ->
+            Histogram binsize (Array.elems (areaHistogram bins binsize (runPowerFunction power) islandimage))
 
-runTableQuery :: Image Word8 -> ImageQueryParameters -> TableQuery -> ImageQueryOutput
-runTableQuery image _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y image))
-runTableQuery image _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r image)
-runTableQuery image _ AverageOfImage = TableValue (averageOfImage image)
-runTableQuery image imagequeryparameters (IslandQuery polarity islandquery) =
-    runIslandQuery (prepareIslandImage polarity imagequeryparameters image) islandquery
+runTableQuery :: Image Word8 -> Image Bool -> TableQuery -> ImageQueryOutput
+runTableQuery grayimage _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y grayimage))
+runTableQuery grayimage _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r grayimage)
+runTableQuery grayimage _ AverageOfImage = TableValue (averageOfImage grayimage)
+runTableQuery _ islandimage (IslandQuery islandquery) =
+    runIslandQuery islandimage islandquery
 
 runIslandQuery :: Image Bool -> IslandQuery -> ImageQueryOutput
 runIslandQuery binaryimage NumberOfIslands = TableValue (fromIntegral (numberOfIslands binaryimage))
@@ -169,16 +164,24 @@ runIslandQuery binaryimage AverageAreaOfIslands = TableValue (
 runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
     numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
 
-prepareIslandImage :: Polarity -> ImageQueryParameters -> Image Word8 -> Image Bool
-prepareIslandImage polarity imagequeryparameters grayimage = cutimage where
-    smoothedimage = smooth (_smoothing imagequeryparameters) grayimage
-    binaryimage = binarize (_threshold imagequeryparameters) smoothedimage
-    invertedimage = case polarity of
-        Bright -> binaryimage
-        Dark -> invert binaryimage
-    stenciledimage = case _stencilImage imagequeryparameters of
-        Nothing -> invertedimage
-        Just stencilimage -> applyStencil stencilimage invertedimage
-    cutimage = case _subRect imagequeryparameters of
-        Nothing -> stenciledimage
-        Just subrect -> cutOut subrect stenciledimage
+prepareIslandImage :: ImageQueryParameters -> Image Word8 -> Image Bool
+prepareIslandImage imagequeryparameters = 
+    maybe id cutOut (_subRect imagequeryparameters) .
+    maybe id applyStencil (_stencilImage imagequeryparameters) .
+    runPolarity (_polarity imagequeryparameters) .
+    binarize (_threshold imagequeryparameters) .
+    smooth (_smoothing imagequeryparameters)
+
+runChannel :: Channel -> RGB -> Word8
+runChannel Red = red
+runChannel Green = green
+runChannel Blue = blue
+
+runPolarity :: Polarity -> Image Bool -> Image Bool
+runPolarity Dark = invert
+runPolarity Bright = id        
+
+runPowerFunction :: Power -> Int -> Int
+runPowerFunction One = id
+runPowerFunction OneOverTwo = round . (sqrt :: Double -> Double) . fromIntegral
+runPowerFunction ThreeOverTwo = round . (^(3 :: Int)) . (sqrt :: Double -> Double) . fromIntegral

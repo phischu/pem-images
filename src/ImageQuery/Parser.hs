@@ -2,7 +2,7 @@ module ImageQuery.Parser where
 
 import ImageQuery (
     ImageQueryStatement(SetImageQueryParameter,GetImageQueryResult),
-    ImageQueryParameter(Threshold,Channel,Smoothing,SubRect,StencilImage),
+    ImageQueryParameter(Threshold,Channel,Smoothing,SubRect,StencilImage,Polarity),
     ImageQuery(TableQuery,IslandImage,ImageOfAverage,LineImage,AreaHistogram),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
@@ -27,7 +27,8 @@ setPropertyParser = choice (map try (map (fmap SetImageQueryParameter) [
     channelParser,
     smoothingParser,
     subrectParser,
-    stencilParser]))
+    stencilParser,
+    polarityParser]))
 
 thresholdParser :: Parser ImageQueryParameter
 thresholdParser = do
@@ -66,6 +67,13 @@ stencilParser = do
     stencilFilePath <- manyTill anyChar newline
     return (StencilImage stencilFilePath Nothing)
 
+polarityParser :: Parser ImageQueryParameter
+polarityParser = do
+    string "set_polarity"
+    spaces
+    polarity <- polarityTypeParser
+    return (Polarity polarity)
+
 tableQueryParser :: Parser ImageQueryStatement
 tableQueryParser = choice (map try (map (fmap (GetImageQueryResult . TableQuery)) [
     valueInPointParser,
@@ -103,23 +111,17 @@ averageOfImageParser = do
 numberOfIslandsParser :: Parser TableQuery
 numberOfIslandsParser = do
     string "table_number_of_islands"
-    spaces
-    polarity <- polarityParser
-    return (IslandQuery polarity NumberOfIslands)
+    return (IslandQuery NumberOfIslands)
 
 averageAreaOfIslandsParser :: Parser TableQuery
 averageAreaOfIslandsParser = do
     string "table_average_area_of_islands"
-    spaces
-    polarity <- polarityParser
-    return (IslandQuery polarity AverageAreaOfIslands)
+    return (IslandQuery AverageAreaOfIslands)
 
 averageOutlineOfIslandsParser :: Parser TableQuery
 averageOutlineOfIslandsParser = do
     string "table_average_outline_of_islands"
-    spaces
-    polarity <- polarityParser
-    return (IslandQuery polarity AverageOutlineOfIslands)
+    return (IslandQuery AverageOutlineOfIslands)
 
 outputParser :: Parser ImageQueryStatement
 outputParser = choice (map try (map (fmap GetImageQueryResult) [
@@ -131,9 +133,7 @@ outputParser = choice (map try (map (fmap GetImageQueryResult) [
 islandImagesParser :: Parser ImageQuery
 islandImagesParser = do
     string "output_island_images"
-    spaces
-    polarity <- polarityParser
-    return (IslandImage polarity)
+    return IslandImage
 
 averageImageParser :: Parser ImageQuery
 averageImageParser = do
@@ -157,20 +157,18 @@ areaHistogramParser :: Parser ImageQuery
 areaHistogramParser = do
     string "output_area_histogram"
     spaces
-    polarity <- polarityParser
-    spaces
     bins <- digits
     spaces
     binsize <- digits
     spaces
     power <- powerParser
-    return (AreaHistogram polarity (read bins) (read binsize) power)
+    return (AreaHistogram (read bins) (read binsize) power)
 
 orientationParser :: Parser Orientation
 orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vertical" >> return Vertical)
 
-polarityParser :: Parser Polarity
-polarityParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
+polarityTypeParser :: Parser Polarity
+polarityTypeParser = (string "bright" >> return Bright) <|> (string "dark" >> return Dark)
 
 channelTypeParser :: Parser Channel
 channelTypeParser =

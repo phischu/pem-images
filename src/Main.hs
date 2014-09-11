@@ -7,8 +7,7 @@ import ImageQuery (
     ImageQueryParameter(Threshold),
     Orientation(Horizontal),
     TableQuery(..),
-    IslandQuery(..),
-    Polarity(Dark,Bright))
+    IslandQuery(..))
 
 testdirectory :: FilePath
 testdirectory = "data/small_dark_islands/"
@@ -16,12 +15,12 @@ testdirectory = "data/small_dark_islands/"
 testqueries :: [ImageQueryStatement]
 testqueries = [
     SetImageQueryParameter (Threshold 14),
-    GetImageQueryResult (TableQuery (IslandQuery Bright NumberOfIslands)),
-    GetImageQueryResult (TableQuery (IslandQuery Bright  AverageOutlineOfIslands)),
-    GetImageQueryResult (IslandImage Dark),
+    GetImageQueryResult (TableQuery (IslandQuery NumberOfIslands)),
+    GetImageQueryResult (TableQuery (IslandQuery  AverageOutlineOfIslands)),
+    GetImageQueryResult IslandImage,
     SetImageQueryParameter (Threshold 251),
-    GetImageQueryResult (IslandImage Bright),
-    GetImageQueryResult (TableQuery (IslandQuery Dark NumberOfIslands)),
+    GetImageQueryResult IslandImage,
+    GetImageQueryResult (TableQuery (IslandQuery NumberOfIslands)),
     GetImageQueryResult (TableQuery (AverageAroundPoint 2 126 12)),
     GetImageQueryResult ImageOfAverage,
     GetImageQueryResult (LineImage Horizontal 5 6 300)]
@@ -29,7 +28,7 @@ testqueries = [
 differentThresholds :: [ImageQueryStatement]
 differentThresholds = do
     threshold <- [0,8..255]
-    [SetImageQueryParameter (Threshold threshold),GetImageQueryResult (IslandImage Dark)]
+    [SetImageQueryParameter (Threshold threshold),GetImageQueryResult IslandImage]
 
 main :: IO ()
 main = gui

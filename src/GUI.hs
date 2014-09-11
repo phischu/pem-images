@@ -7,7 +7,7 @@ import ImageQuery (
     Polarity(Dark,Bright),
     Orientation(Horizontal,Vertical),
     Channel(Red,Green,Blue),
-    ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing),
+    ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing,Polarity),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
     Power(One,OneOverTwo,ThreeOverTwo))
@@ -262,6 +262,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
     stencilPanel            <- createStatementPanel stencilControl
     thresholdPanel          <- createStatementPanel thresholdControl
     smoothingPanel          <- createStatementPanel smoothingControl
+    polarityPanel           <- createStatementPanel polarityControl
     valueInPointPanel       <- createStatementPanel valueInPointControl
     averageAroundPointPanel <- createStatementPanel averageAroundPointControl
     averageOfImagePanel     <- createStatementPanel averageOfImageControl
@@ -273,7 +274,8 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
             widget subrectPanel,
             widget stencilPanel,
             widget thresholdPanel,
-            widget smoothingPanel]),
+            widget smoothingPanel,
+            widget polarityPanel]),
         boxed "Output" (column 5 [
             widget averageImagePanel,
             widget islandImagePanel,
@@ -295,13 +297,9 @@ averageImageControl = StatementControl "Average Image" (\_ -> do
     return ([],getStatement))
 
 islandImageControl :: StatementControl
-islandImageControl = StatementControl "Island Image" (\parentPanel -> do
-    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
-    let getStatement = do
-            polaritySelection <- Wx.get polarityChoice selection
-            let polarity = if polaritySelection == 0 then Dark else Bright
-            return (GetImageQueryResult (IslandImage polarity))
-    return ([widget polarityChoice],getStatement))
+islandImageControl = StatementControl "Island Image" (\_ -> do
+    let getStatement = return (GetImageQueryResult IslandImage)
+    return ([],getStatement))
 
 lineImageControl :: StatementControl
 lineImageControl = StatementControl "Line Image" (\parentPanel -> do
@@ -324,24 +322,21 @@ lineImageControl = StatementControl "Line Image" (\parentPanel -> do
 
 areaHistogramControl :: StatementControl
 areaHistogramControl = StatementControl "Area Histogram" (\parentPanel -> do
-    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
     binsEntry <- entry parentPanel [text := "1"]
     binsizeEntry <- entry parentPanel [text := "1"]
     powerChoice <- choice parentPanel [items := ["One","One over two","Three over two"],selection := 0]
     let getStatement = do
-            polaritySelection <- Wx.get polarityChoice selection
             binsText <- Wx.get binsEntry text
             binsizeText <- Wx.get binsizeEntry text
             powerSelection <- Wx.get powerChoice selection
-            let polarity = if polaritySelection == 0 then Dark else Bright
-                bins = read binsText
+            let bins = read binsText
                 binsize = read binsizeText
                 power = case powerSelection of
                     0 -> One
                     1 -> OneOverTwo
                     2 -> ThreeOverTwo
-            return (GetImageQueryResult (AreaHistogram polarity bins binsize power))
-        layouts = [widget polarityChoice,widget binsEntry,widget binsizeEntry,widget powerChoice]
+            return (GetImageQueryResult (AreaHistogram bins binsize power))
+        layouts = [widget binsEntry,widget binsizeEntry,widget powerChoice]
     return (layouts,getStatement))
 
 channelControl :: StatementControl
@@ -398,6 +393,17 @@ smoothingControl = StatementControl "Smoothing" (\parentPanel -> do
             return (SetImageQueryParameter (Smoothing (read smoothingText)))
     return ([widget smoothingEntry],getStatement))
 
+polarityControl :: StatementControl
+polarityControl = StatementControl "Polarity" (\parentPanel -> do
+    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
+    let getStatement = do
+            polaritySelection <- Wx.get polarityChoice selection
+            let polarity = case polaritySelection of
+                    0 -> Dark
+                    1 -> Bright
+            return (SetImageQueryParameter (Polarity polarity))
+    return ([widget polarityChoice],getStatement))
+
 valueInPointControl :: StatementControl
 valueInPointControl = StatementControl "Value in Point" (\parentPanel -> do
     [xEntry,yEntry] <- replicateM 2 (entry parentPanel [text := "0"])
@@ -424,16 +430,13 @@ averageOfImageControl = StatementControl "Average Of Image" (\_ -> do
 
 islandQueryControl :: StatementControl
 islandQueryControl = StatementControl "Island Query" (\parentPanel -> do
-    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
     islandQueryChoice <- choice parentPanel [items := ["Number","Average Area","Average Outline"],selection := 0]
     let getStatement = do
-            polaritySelection <- Wx.get polarityChoice selection
             islandQuerySelection <- Wx.get islandQueryChoice selection
-            let polarity = if polaritySelection == 0 then Dark else Bright
-                islandQuery = case islandQuerySelection of
+            let islandQuery = case islandQuerySelection of
                     0 -> NumberOfIslands
                     1 -> AverageAreaOfIslands
                     2 -> AverageOutlineOfIslands
-            return (GetImageQueryResult (TableQuery (IslandQuery polarity islandQuery)))
-    return ([widget polarityChoice,widget islandQueryChoice],getStatement))
+            return (GetImageQueryResult (TableQuery (IslandQuery islandQuery)))
+    return ([widget islandQueryChoice],getStatement))
 
