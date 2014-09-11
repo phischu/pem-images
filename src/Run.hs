@@ -11,7 +11,7 @@ import ImageProcessing (
     Image,imageToJuicy,
     singleAverageImage,addImage,finalizeAverageImage,
     singleLineImage,appendLine)
-import ImageQuery.Printer (channelPrinter,polarityPrinter)
+import ImageQuery.Printer (channelPrinter,polarityPrinter,powerPrinter)
 
 import Codec.Picture (Pixel8,writeBitmap)
 
@@ -112,7 +112,8 @@ saveHistograms resultsPath i histograms = forM_ histograms (\(imagequeryparamete
     let histogramRow r v = show r ++ " " ++ show v
         histogrampath =
             resultsPath </> histogramsPath </>
-            parametersPath imagequeryparameters </> histogramPath i
+            parametersPath imagequeryparameters </>
+            intercalate "-" [show binsize,powerPrinter power] </> histogramPath i
     createDirectoryIfMissing True (dropFileName histogrampath)
     writeFile histogrampath (unlines (map (uncurry histogramRow) histogram)))
 
