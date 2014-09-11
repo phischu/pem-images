@@ -19,8 +19,10 @@ import qualified Codec.Picture as Juicy (
 import Data.Word (Word8)
 
 import Data.Array (
-    Array,indices,(!))
-import qualified Data.Set as Set (empty,insert,size)
+    Array,elems)
+import Data.Map (Map)
+import qualified Data.Map.Strict as Map (
+    fromListWith,delete,size)
 import Data.Array.ST (
     STArray,runSTArray,newArray,newArray_,readArray,writeArray)
 import Control.Monad.ST (
@@ -42,6 +44,7 @@ data RGB = RGB {
     green :: Word8,
     blue :: Word8}
 type Rect = (Int,Int,Int,Int)
+type Label = Int
 
 juicyToImage :: Juicy.Image Juicy.PixelRGB8 -> Image RGB
 juicyToImage juicy = Repa.delay (
@@ -108,7 +111,7 @@ averageOfImage image = sumOfPixels / numberOfPixels where
     Z:.h:.w = extent image
 
 numberOfIslands :: Image Bool -> Int
-numberOfIslands image = numberOfLabels (labelArray image)
+numberOfIslands image = numberOfLabels (labelMap (labelArray image))
 
 binarize :: Threshold -> Image Word8 -> Image Bool
 binarize threshold image = Repa.delay (Repa.computeUnboxedS (Repa.map (\pixelvalue -> pixelvalue > threshold) image))
@@ -168,9 +171,8 @@ finalizeAverageImage (Just image) n
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
 
-areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> Array Int Int
-areaHistogram bins _ _ _ = runSTArray (do
-    newArray_ (0,bins - 1))
+areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> [Int]
+areaHistogram _ _ _ _ = undefined
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do
@@ -209,9 +211,8 @@ labelArray image = runSTArray (do
             writeArray labelimage (x,y) label))     
     return labelimage)
 
-numberOfLabels :: Array (Int,Int) Int -> Int
-numberOfLabels arr = Set.size (go Set.empty (indices arr)) where
-    go !labels [] = labels
-    go !labels (i:rest)
-        | (arr ! i) == 0 = go labels rest
-        | otherwise = go (Set.insert (arr ! i) labels) rest
+labelMap :: Array (Int,Int) Label -> Map Label Int
+labelMap arr = Map.fromListWith (+) (zip (elems arr) (repeat 1))
+
+numberOfLabels :: Map Label Int -> Int
+numberOfLabels = Map.size . Map.delete 0

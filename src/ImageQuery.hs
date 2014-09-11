@@ -17,7 +17,6 @@ import Data.Foldable (foldMap)
 import Data.Word (Word8)
 
 import qualified Data.Vector.Unboxed as Unboxed (Vector)
-import qualified Data.Array as Array (elems)
 
 data ImageQueryStatement =
     SetImageQueryParameter ImageQueryParameter |
@@ -148,7 +147,7 @@ getImageQueryOutput image imagequeryparameters imagequery =
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
         IslandImage -> OutputImage (blackAndWhite islandimage)
         AreaHistogram bins binsize power ->
-            Histogram binsize (Array.elems (areaHistogram bins binsize (runPowerFunction power) islandimage))
+            Histogram binsize (areaHistogram bins binsize (runPowerFunction power) islandimage)
 
 runTableQuery :: Image Word8 -> Image Bool -> TableQuery -> ImageQueryOutput
 runTableQuery grayimage _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y grayimage))
