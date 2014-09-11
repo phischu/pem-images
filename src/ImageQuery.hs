@@ -178,8 +178,8 @@ runChannel Green = green
 runChannel Blue = blue
 
 runPolarity :: Polarity -> Image Bool -> Image Bool
-runPolarity Dark = id
-runPolarity Bright = invert        
+runPolarity Dark = invert
+runPolarity Bright = id        
 
 runPowerFunction :: Power -> Int -> Int
 runPowerFunction One = id

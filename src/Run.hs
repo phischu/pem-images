@@ -64,7 +64,7 @@ consumeResults tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
         saveTableRow tablehandle (_tableRow imagequeryresult)
         saveAverageImage (finalizeAverageImage maybeaverageimage' n')
         maybe (return ()) saveLineImages maybelineimages'
-        saveHistograms (_histograms imagequeryresult))))
+        saveHistograms n (_histograms imagequeryresult))))
 
 saveIntermediateImages :: Int -> [Image Pixel8] -> IO ()
 saveIntermediateImages n outputimages = forM_ (zip [0..] outputimages) (\(i,image) -> do
@@ -95,13 +95,13 @@ saveLineImages lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
 lineImagePath :: Int -> FilePath
 lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
-saveHistograms :: [[(Int,Int)]] -> IO ()
-saveHistograms histograms = forM_ (zip [0..] histograms) (\(i,histogram) -> do
+saveHistograms :: Int -> [[(Int,Int)]] -> IO ()
+saveHistograms i histograms = forM_ (zip [0..] histograms) (\(c,histogram) -> do
     let histogramRow r v = show r ++ " " ++ show v
-    writeFile (histogramPath i) (unlines (map (uncurry histogramRow) histogram)))
+    writeFile (histogramPath i c) (unlines (map (uncurry histogramRow) histogram)))
 
-histogramPath :: Int -> FilePath
-histogramPath i = "result" </> "histograms" </> "histogram-" ++ show i ++ ".csv"
+histogramPath :: Int -> Int -> FilePath
+histogramPath i c = "result" </> "histograms" </> "histogram-" ++ show i ++ "-" ++ show c ++ ".csv"
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
