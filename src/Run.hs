@@ -27,7 +27,7 @@ import Control.Monad.Trans.State (evalStateT,get,put)
 import Control.Error (EitherT,runEitherT,scriptIO,fmapLT)
 
 import System.Directory (createDirectoryIfMissing)
-import System.FilePath ((</>),takeBaseName)
+import System.FilePath ((</>),takeBaseName,dropFileName)
 import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
 
 import Data.Maybe (listToMaybe)
@@ -37,8 +37,7 @@ run :: FilePath -> [ImageQueryStatement] -> IO (Either String ())
 run inputdirectory imagequerystatements = runEitherT (do
     let inputbasename = takeBaseName inputdirectory
         resultsPath = "results" </> inputbasename
-    scriptIO (createDirectoryIfMissing True (resultsPath </> islandImagesPath))
-    scriptIO (createDirectoryIfMissing True (resultsPath </> histogramsPath))
+    scriptIO (createDirectoryIfMissing True resultsPath)
     tablehandle <- scriptIO (openFile (resultsPath </> tablePath) WriteMode)
     runEffect (
         imageSeries inputdirectory >->
@@ -105,6 +104,7 @@ saveIslandImages resultsPath n islandimages = forM_ islandimages (\(imagequerypa
     let islandimagepath =
             resultsPath </> islandImagesPath </>
             parametersPath imagequeryparameters </> islandImagePath n
+    createDirectoryIfMissing True (dropFileName islandimagepath)
     writeBitmap islandimagepath (imageToJuicy islandimage)) where
         
 saveHistograms :: FilePath -> Int -> [(ImageQueryParameters,Int,Power,[(Int,Int)])] -> IO ()
@@ -113,6 +113,7 @@ saveHistograms resultsPath i histograms = forM_ histograms (\(imagequeryparamete
         histogrampath =
             resultsPath </> histogramsPath </>
             parametersPath imagequeryparameters </> histogramPath i
+    createDirectoryIfMissing True (dropFileName histogrampath)
     writeFile histogrampath (unlines (map (uncurry histogramRow) histogram)))
 
 saveAverageImage :: FilePath -> Image Pixel8 -> IO ()
