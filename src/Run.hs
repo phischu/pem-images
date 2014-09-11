@@ -95,13 +95,13 @@ saveLineImages lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
 lineImagePath :: Int -> FilePath
 lineImagePath i = "result" </> "lineimage-" ++ show i ++ ".bmp"
 
-saveHistograms :: [(Int,[Int])] -> IO ()
-saveHistograms histograms = forM_ (zip [0..] histograms) (\(i,(binsize,values)) -> do
+saveHistograms :: [[(Int,Int)]] -> IO ()
+saveHistograms histograms = forM_ (zip [0..] histograms) (\(i,histogram) -> do
     let histogramRow r v = show r ++ " " ++ show v
-    writeFile (histogramPath i) (unlines (zipWith histogramRow [0,binsize..] values)))
+    writeFile (histogramPath i) (unlines (map (uncurry histogramRow) histogram)))
 
 histogramPath :: Int -> FilePath
-histogramPath i = "result" </> "histogram-" ++ show i ++ ".csv"
+histogramPath i = "result" </> "histograms" </> "histogram-" ++ show i ++ ".csv"
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT
