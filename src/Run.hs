@@ -4,11 +4,14 @@ import ImageLoading (
     imageSeries)
 import ImageQuery (
     ImageQueryStatement,runImageQueries,
-    ImageQueryResult(_averageImages,_imageLines,_outputImages,_tableRow,_histograms))
+    ImageQueryParameters(_channel,_smoothing,_threshold,_polarity),
+    ImageQueryResult(_averageImages,_imageLines,_outputImages,_tableRow,_histograms),
+    Power)
 import ImageProcessing (
     Image,imageToJuicy,
     singleAverageImage,addImage,finalizeAverageImage,
     singleLineImage,appendLine)
+import ImageQuery.Printer (channelPrinter,polarityPrinter)
 
 import Codec.Picture (Pixel8,writeBitmap)
 
@@ -28,6 +31,7 @@ import System.FilePath ((</>),takeBaseName)
 import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
 
 import Data.Maybe (listToMaybe)
+import Data.List (intercalate)
 
 run :: FilePath -> [ImageQueryStatement] -> IO (Either String ())
 run inputdirectory imagequerystatements = runEitherT (do
@@ -45,14 +49,14 @@ run inputdirectory imagequerystatements = runEitherT (do
 islandImagesPath :: FilePath
 islandImagesPath = "islandimages"
 
-islandImagePath :: Int -> Int -> FilePath
-islandImagePath i c = "islandimage-" ++ show i ++ "-" ++ show c ++ ".bmp"
+islandImagePath :: Int -> FilePath
+islandImagePath i = "islandimage-" ++ show i ++ ".bmp"
 
 histogramsPath :: FilePath
 histogramsPath = "histograms"
 
-histogramPath :: Int -> Int -> FilePath
-histogramPath i c = "histogram-" ++ show i ++ "-" ++ show c ++ ".csv"
+histogramPath :: Int -> FilePath
+histogramPath i = "histogram-" ++ show i ++ ".csv"
 
 averageImagePath :: FilePath
 averageImagePath = "averageimage.bmp"
@@ -62,6 +66,13 @@ lineImagePath i = "lineimage-" ++ show i ++ ".bmp"
 
 tablePath :: FilePath
 tablePath = "table.csv"
+
+parametersPath :: ImageQueryParameters -> FilePath
+parametersPath imagequeryparameters = intercalate "-" [
+    channelPrinter (_channel imagequeryparameters),
+    show (_smoothing imagequeryparameters),
+    show (_threshold imagequeryparameters),
+    polarityPrinter (_polarity imagequeryparameters)]
 
 consumeResults :: (MonadIO m) => FilePath -> Handle -> Consumer ImageQueryResult m r
 consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
@@ -89,14 +100,20 @@ consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (fo
         forM_ maybelineimages' (saveLineImages resultsPath)
         saveHistograms resultsPath n (_histograms imagequeryresult))))
 
-saveIslandImages :: FilePath -> Int -> [Image Pixel8] -> IO ()
-saveIslandImages resultsPath n islandimages = forM_ (zip [0..] islandimages) (\(i,islandimage) -> do
-    writeBitmap (resultsPath </> islandImagesPath </> islandImagePath i n) (imageToJuicy islandimage))
-
-saveHistograms :: FilePath -> Int -> [[(Int,Int)]] -> IO ()
-saveHistograms resultsPath i histograms = forM_ (zip [0..] histograms) (\(c,histogram) -> do
+saveIslandImages :: FilePath -> Int -> [(ImageQueryParameters,Image Pixel8)] -> IO ()
+saveIslandImages resultsPath n islandimages = forM_ islandimages (\(imagequeryparameters,islandimage) -> do
+    let islandimagepath =
+            resultsPath </> islandImagesPath </>
+            parametersPath imagequeryparameters </> islandImagePath n
+    writeBitmap islandimagepath (imageToJuicy islandimage)) where
+        
+saveHistograms :: FilePath -> Int -> [(ImageQueryParameters,Int,Power,[(Int,Int)])] -> IO ()
+saveHistograms resultsPath i histograms = forM_ histograms (\(imagequeryparameters,binsize,power,histogram) -> do
     let histogramRow r v = show r ++ " " ++ show v
-    writeFile (resultsPath </> histogramsPath </> histogramPath i c) (unlines (map (uncurry histogramRow) histogram)))
+        histogrampath =
+            resultsPath </> histogramsPath </>
+            parametersPath imagequeryparameters </> histogramPath i
+    writeFile histogrampath (unlines (map (uncurry histogramRow) histogram)))
 
 saveAverageImage :: FilePath -> Image Pixel8 -> IO ()
 saveAverageImage resultsPath = writeBitmap (resultsPath </> averageImagePath) . imageToJuicy

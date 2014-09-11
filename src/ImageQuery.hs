@@ -75,18 +75,18 @@ data ImageQueryParameters = ImageQueryParameters {
     _polarity :: Polarity}
 
 data ImageQueryOutput =
-    OutputImage (Image Word8) |
+    OutputImage ImageQueryParameters (Image Word8) |
     AverageImage (Image Word8) |
     TableValue Double |
     ImageLine (Unboxed.Vector Word8) |
-    Histogram [(Int,Int)]
+    Histogram ImageQueryParameters Int Power [(Int,Int)]
 
 data ImageQueryResult = ImageQueryResult {
-    _outputImages :: [Image Word8],
+    _outputImages :: [(ImageQueryParameters,Image Word8)],
     _averageImages :: [Image Word8],
     _tableRow :: [Double],
     _imageLines :: [Unboxed.Vector Word8],
-    _histograms :: [[(Int,Int)]]}
+    _histograms :: [(ImageQueryParameters,Int,Power,[(Int,Int)])]}
 
 instance Monoid ImageQueryResult where
     mempty = ImageQueryResult [] [] [] [] []
@@ -103,11 +103,13 @@ initialImageQueryParameters :: ImageQueryParameters
 initialImageQueryParameters = ImageQueryParameters Red Nothing Nothing 0 0 Dark
 
 outputToResult :: ImageQueryOutput -> ImageQueryResult
-outputToResult (OutputImage outputimage) = mempty {_outputImages = [outputimage]}
+outputToResult (OutputImage imagequeryparameters outputimage) =
+    mempty {_outputImages = [(imagequeryparameters,outputimage)]}
 outputToResult (AverageImage averageimage) = mempty {_averageImages = [averageimage]}
 outputToResult (TableValue tablevalue) = mempty {_tableRow = [tablevalue]}
 outputToResult (ImageLine imageline) = mempty {_imageLines = [imageline]}
-outputToResult (Histogram histogram) = mempty {_histograms = [histogram]}
+outputToResult (Histogram imagequeryparameters binsize power histogram) =
+    mempty {_histograms = [(imagequeryparameters,binsize,power,histogram)]}
 
 runImageQueries :: (Monad m) => [ImageQueryStatement] -> Image RGB -> m ImageQueryResult
 runImageQueries imagequerystatements image = flip evalStateT initialImageQueryParameters (do
@@ -144,9 +146,9 @@ getImageQueryOutput image imagequeryparameters imagequery =
         ImageOfAverage -> AverageImage grayimage
         LineImage Horizontal x y l -> ImageLine (horizontalLine x y l grayimage)
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
-        IslandImage -> OutputImage (blackAndWhite islandimage)
-        AreaHistogram binsize power ->
-            Histogram (areaHistogram binsize (runPowerFunction power) islandimage)
+        IslandImage -> OutputImage imagequeryparameters (blackAndWhite islandimage)
+        AreaHistogram binsize power -> Histogram imagequeryparameters binsize power histogram where
+            histogram = areaHistogram binsize (runPowerFunction power) islandimage
 
 runTableQuery :: Image Word8 -> Image Bool -> TableQuery -> ImageQueryOutput
 runTableQuery grayimage _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y grayimage))
