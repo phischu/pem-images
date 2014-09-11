@@ -27,7 +27,7 @@ data ImageQuery =
     ImageOfAverage |
     LineImage Orientation Int Int Int |
     IslandImage |
-    AreaHistogram Int Int Power deriving Show
+    AreaHistogram Int Power deriving Show
 
 data ImageQueryParameter =
     Channel Channel |
@@ -145,8 +145,8 @@ getImageQueryOutput image imagequeryparameters imagequery =
         LineImage Horizontal x y l -> ImageLine (horizontalLine x y l grayimage)
         LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
         IslandImage -> OutputImage (blackAndWhite islandimage)
-        AreaHistogram bins binsize power ->
-            Histogram binsize (areaHistogram bins binsize (runPowerFunction power) islandimage)
+        AreaHistogram binsize power ->
+            Histogram binsize (areaHistogram binsize (runPowerFunction power) islandimage)
 
 runTableQuery :: Image Word8 -> Image Bool -> TableQuery -> ImageQueryOutput
 runTableQuery grayimage _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y grayimage))

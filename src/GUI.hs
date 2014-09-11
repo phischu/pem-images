@@ -322,21 +322,18 @@ lineImageControl = StatementControl "Line Image" (\parentPanel -> do
 
 areaHistogramControl :: StatementControl
 areaHistogramControl = StatementControl "Area Histogram" (\parentPanel -> do
-    binsEntry <- entry parentPanel [text := "1"]
     binsizeEntry <- entry parentPanel [text := "1"]
     powerChoice <- choice parentPanel [items := ["One","One over two","Three over two"],selection := 0]
     let getStatement = do
-            binsText <- Wx.get binsEntry text
             binsizeText <- Wx.get binsizeEntry text
             powerSelection <- Wx.get powerChoice selection
-            let bins = read binsText
-                binsize = read binsizeText
+            let binsize = read binsizeText
                 power = case powerSelection of
                     0 -> One
                     1 -> OneOverTwo
                     2 -> ThreeOverTwo
-            return (GetImageQueryResult (AreaHistogram bins binsize power))
-        layouts = [widget binsEntry,widget binsizeEntry,widget powerChoice]
+            return (GetImageQueryResult (AreaHistogram binsize power))
+        layouts = [widget binsizeEntry,widget powerChoice]
     return (layouts,getStatement))
 
 channelControl :: StatementControl

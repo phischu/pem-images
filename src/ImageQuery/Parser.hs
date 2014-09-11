@@ -157,12 +157,10 @@ areaHistogramParser :: Parser ImageQuery
 areaHistogramParser = do
     string "output_area_histogram"
     spaces
-    bins <- digits
-    spaces
     binsize <- digits
     spaces
     power <- powerParser
-    return (AreaHistogram (read bins) (read binsize) power)
+    return (AreaHistogram (read binsize) power)
 
 orientationParser :: Parser Orientation
 orientationParser = (string "horizontal" >> return Horizontal) <|> (string "vertical" >> return Vertical)

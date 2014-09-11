@@ -22,7 +22,7 @@ import Data.Array (
     Array,elems)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map (
-    fromListWith,delete,size)
+    fromListWith,delete,size,elems,maxViewWithKey,findWithDefault)
 import Data.Array.ST (
     STArray,runSTArray,newArray,newArray_,readArray,writeArray)
 import Control.Monad.ST (
@@ -171,8 +171,18 @@ finalizeAverageImage (Just image) n
     | otherwise = Just (Repa.map (\pixelvalue -> fromIntegral (pixelvalue `div` fromIntegral n)) image)
 
 
-areaHistogram :: Int -> Int -> (Int -> Int) -> Image Bool -> [Int]
-areaHistogram _ _ _ _ = undefined
+areaHistogram :: Int -> (Int -> Int) -> Image Bool -> [Int]
+areaHistogram binsize powerfunction islandimage = map (\i -> Map.findWithDefault 0 i histogram) [0..maxKey] where
+    histogram = Map.fromListWith (+) (zip values (repeat 1))
+    values = map binning (Map.elems (labelMap (labelArray islandimage)))
+    binning area = powerfunction area `div` binsize
+    maxKey = maybe 0 (fst . fst) (Map.maxViewWithKey histogram)
+
+labelMap :: Array (Int,Int) Label -> Map Label Int
+labelMap arr = Map.delete 0 (Map.fromListWith (+) (zip (elems arr) (repeat 1)))
+
+numberOfLabels :: Map Label Int -> Int
+numberOfLabels = Map.size
 
 labelArray :: Image Bool -> Array (Int,Int) Int
 labelArray image = runSTArray (do
@@ -210,9 +220,3 @@ labelArray image = runSTArray (do
             label <- UnionFind.descriptor point
             writeArray labelimage (x,y) label))     
     return labelimage)
-
-labelMap :: Array (Int,Int) Label -> Map Label Int
-labelMap arr = Map.fromListWith (+) (zip (elems arr) (repeat 1))
-
-numberOfLabels :: Map Label Int -> Int
-numberOfLabels = Map.size . Map.delete 0

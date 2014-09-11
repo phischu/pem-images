@@ -36,11 +36,8 @@ imageQueryPrinter ImageOfAverage = "output_average_image"
 imageQueryPrinter (LineImage orientation x y l) =
     "output_line_image " ++ orientationPrinter orientation ++ " " ++ numbersPrinter [x,y,l]
 imageQueryPrinter IslandImage = "output_island_images"
-imageQueryPrinter (AreaHistogram bins binsize power) = unwords [
-    "output_area_histogram",
-    show bins,
-    show binsize,
-    powerPrinter power]
+imageQueryPrinter (AreaHistogram binsize power) = unwords [
+    "output_area_histogram",show binsize,powerPrinter power]
 
 
 tableQueryPrinter :: Printer TableQuery
