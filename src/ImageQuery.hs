@@ -138,8 +138,7 @@ setImageQueryParameter (Polarity polarity) =
 
 getImageQueryOutput :: Image RGB -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
 getImageQueryOutput image imagequeryparameters imagequery =
-    let grayimage = chooseChannel (runChannel (_channel imagequeryparameters)) image
-        islandimage = prepareIslandImage imagequeryparameters grayimage
+    let (grayimage,islandimage) = prepareImage imagequeryparameters image
     in case imagequery of
         TableQuery tablequery -> runTableQuery grayimage islandimage tablequery
         ImageOfAverage -> AverageImage grayimage
@@ -163,13 +162,15 @@ runIslandQuery binaryimage AverageAreaOfIslands = TableValue (
 runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
     numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
 
-prepareIslandImage :: ImageQueryParameters -> Image Word8 -> Image Bool
-prepareIslandImage imagequeryparameters = 
-    maybe id cutOut (_subRect imagequeryparameters) .
-    maybe id applyStencil (_stencilImage imagequeryparameters) .
-    runPolarity (_polarity imagequeryparameters) .
-    binarize (_threshold imagequeryparameters) .
-    smooth (_smoothing imagequeryparameters)
+prepareImage :: ImageQueryParameters -> Image RGB -> (Image Word8,Image Bool)
+prepareImage imagequeryparameters image = (grayimage,islandimage) where
+    grayimage = chooseChannel (runChannel (_channel imagequeryparameters)) image
+    islandimage =
+        maybe id cutOut (_subRect imagequeryparameters) (
+            maybe id applyStencil (_stencilImage imagequeryparameters) (
+                runPolarity (_polarity imagequeryparameters) (
+                    binarize (_threshold imagequeryparameters) (
+                        smooth (_smoothing imagequeryparameters) grayimage))))
 
 runChannel :: Channel -> RGB -> Word8
 runChannel Red = red
