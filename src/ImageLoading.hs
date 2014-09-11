@@ -13,11 +13,12 @@ import System.Directory
 import System.FilePath
 import Control.Error
 
-imageSeries :: (MonadIO m) => FilePath -> Producer (Image RGB) (EitherT ImageLoadingError m) ()
+imageSeries :: (MonadIO m) => FilePath -> Producer (FilePath,Image RGB) (EitherT ImageLoadingError m) ()
 imageSeries seriespath =
     filesInDirectory seriespath >->
-    Pipes.mapM loadImage >->
-    Pipes.map juicyToImage
+    Pipes.mapM (\imagepath -> do
+        image <- loadImage imagepath
+        return (imagepath,juicyToImage image))
 
 data ImageLoadingError =
     ReadImageError String |
