@@ -64,7 +64,7 @@ parametersPath imagequeryparameters = intercalate "-" [
     show (_threshold imagequeryparameters),
     polarityPrinter (_polarity imagequeryparameters)]
 
-consumeResults :: (MonadIO m) => FilePath -> Handle -> Consumer (FilePath,ImageQueryResult) m r
+consumeResults :: FilePath -> Handle -> Consumer (FilePath,ImageQueryResult) IO r
 consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
 
     (imagepath,imagequeryresult) <- lift await
