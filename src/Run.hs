@@ -28,7 +28,7 @@ import Control.Error (EitherT,runEitherT,scriptIO,fmapLT)
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>),(<.>),takeBaseName,dropFileName)
-import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode))
+import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode),hFlush)
 
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
@@ -112,8 +112,10 @@ saveLineImages resultsPath lineimages = forM_ (zip [0..] lineimages) (\(i,lineim
     writeBitmap (resultsPath </> lineImagePath i) (imageToJuicy lineimage))
 
 saveTableRow :: FilePath -> Handle -> [Double] -> IO ()
-saveTableRow imagebasename tablehandle tablerow = hPutStrLn tablehandle (intercalate "\t" entries) where
-    entries = [imagebasename] ++ map show tablerow
+saveTableRow imagebasename tablehandle tablerow = do
+    let entries = [imagebasename] ++ map show tablerow
+    hPutStrLn tablehandle (intercalate "\t" entries)
+    hFlush tablehandle
 
 csvRow :: [Double] -> String
 csvRow = unwords . map show

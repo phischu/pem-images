@@ -33,7 +33,7 @@ import qualified Data.UnionFind.ST as UnionFind (
     Point,fresh,equivalent,union,descriptor)
 
 import Control.Monad (when)
-import Data.Traversable (forM)
+import Control.Loop (numLoop)
 
 import Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as Vector (map,enumFromStepN,length)
@@ -191,8 +191,8 @@ labelArray image = runSTArray (do
         lasty = h - 1
     zero <- UnionFind.fresh 0
     pointimage <- newArray_ ((0,0),(lastx,lasty)) :: ST s (STArray s (Int,Int) (UnionFind.Point s Int))
-    forM [0..lasty] (\y -> do
-        forM [0..lastx] (\x -> do
+    numLoop 0 lasty (\y -> do
+        numLoop 0 lastx (\x -> do
             writeArray pointimage (x,y) zero
             when (index image (Z:.y:.x)) (do
                 leftpoint <- if x <= 0 then return zero else readArray pointimage (x-1,y)
@@ -213,8 +213,8 @@ labelArray image = runSTArray (do
                         writeArray pointimage (x,y) leftpoint
                         UnionFind.union leftpoint upperpoint)))
     labelimage <- newArray ((0,0),(lastx,lasty)) 0
-    forM [0..lasty] (\y -> do
-        forM [0..lastx] (\x -> do
+    numLoop 0 lasty (\y -> do
+        numLoop 0 lastx (\x -> do
             point <- readArray pointimage (x,y)
             label <- UnionFind.descriptor point
             writeArray labelimage (x,y) label))     
