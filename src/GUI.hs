@@ -21,7 +21,7 @@ import Graphics.UI.WX (
     start,
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
-    fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,
+    fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,infoDialog,
     Prop((:=)),set,text,items,sz,position,pt,selection,text,
     on,command,
     Layout,layout,widget,row,column,minsize,boxed,
@@ -37,6 +37,7 @@ import MVC (
 import Pipes (await,yield)
 import Control.Monad.State.Class (get,put,gets)
 
+import Control.Exception (catch,SomeException)
 import Control.Monad (forever,replicateM,forM,when)
 import Data.Monoid (mconcat)
 
@@ -126,8 +127,9 @@ gui = start (do
                 atomically (send programChangedO imagequerystatements)
                 return ()
             sink (ResponseRunProgram inputpath imagequerystatements) = do
-                run inputpath imagequerystatements
-                putStrLn "Run finished!"
+                catch (run inputpath imagequerystatements) (\e ->
+                    errorDialog parentFrame "Error during run" (show (e :: SomeException)))
+                infoDialog parentFrame "Run finished!" "Success!"
             sink (ResponseInputPath inputpath) = do
                 atomically (send inputPathChangedO inputpath)
                 return ()
