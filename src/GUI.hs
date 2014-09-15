@@ -10,7 +10,8 @@ import ImageQuery (
     ImageQueryParameter(Channel,SubRect,StencilImage,Threshold,Smoothing,Polarity),
     TableQuery(ValueInPoint,AverageAroundPoint,AverageOfImage,IslandQuery),
     IslandQuery(NumberOfIslands,AverageAreaOfIslands,AverageOutlineOfIslands),
-    Power(One,OneOverTwo,ThreeOverTwo))
+    Power(One,OneOverTwo,ThreeOverTwo),
+    forStencil)
 import ImageQuery.Parser (imageQueriesParser)
 import ImageQuery.Printer (imageQueriesPrinter,imageQueryStatementPrinter)
 import ImageLoading (loadImage)
@@ -181,7 +182,10 @@ createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes
                 case parseResult of
                     Left message -> errorDialog parentFrame "Parse Error" (show message)
                     Right imagequerystatements -> do
-                        atomically (send loadProgramO (RequestLoadProgram imagequerystatements))
+                        imagequerystatements' <- forStencil imagequerystatements ((\(StencilImage stencilpath _ ) -> do
+                            image <- loadImage stencilpath
+                            return (StencilImage stencilpath (Just (binarize 0 (chooseChannel red (juicyToImage image)))))))
+                        atomically (send loadProgramO (RequestLoadProgram imagequerystatements'))
                         return ()
 
 createProgramListBox :: Frame () -> Input [ImageQueryStatement] -> IO (SingleListBox ())

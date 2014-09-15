@@ -204,3 +204,11 @@ entryName (GetImageQueryResult (TableQuery tablequery)) = Just (case tablequery 
         AverageAreaOfIslands -> "average_area_of_islands"
         AverageOutlineOfIslands -> "average_outline_of_islands")
 entryName _ = Nothing
+
+forStencil :: [ImageQueryStatement] -> (ImageQueryParameter -> IO ImageQueryParameter) -> IO [ImageQueryStatement]
+forStencil imagequerystatements f = forM imagequerystatements (\imagequerystatement -> do
+    case imagequerystatement of
+        (SetImageQueryParameter imagequeryparameter@(StencilImage _ _)) -> do
+            imagequeryparameter' <- f imagequeryparameter
+            return (SetImageQueryParameter imagequeryparameter')
+        _ -> return imagequerystatement)
