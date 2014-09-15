@@ -23,7 +23,7 @@ import Graphics.UI.WX (
     frame,Frame,button,Button,
     singleListBox,SingleListBox,
     fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,infoDialog,
-    Prop((:=)),set,text,items,sz,position,pt,selection,text,
+    Prop((:=)),set,text,items,itemCount,sz,position,pt,selection,text,
     on,command,
     Layout,layout,widget,row,column,minsize,boxed,
     panel,Panel,choice,entry,staticText,StaticText)
@@ -199,9 +199,12 @@ createProgramListBox parentFrame programChangedI = do
             Nothing -> return ()
             Just imagequerystatements -> do
                 index <- Wx.get programListBox selection
+                itemcount <- Wx.get programListBox itemCount
                 set programListBox [
                     items := map imageQueryStatementPrinter imagequerystatements ++ ["NEW STATEMENT"],
-                    selection := index + 1]))
+                    selection := if length imagequerystatements >= itemcount
+                        then index + 1
+                        else index]))
     return programListBox
 
 createRunProgramButton :: Frame () -> Output Request -> IO (Button ())
