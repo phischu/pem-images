@@ -38,7 +38,6 @@ import Pipes (await,yield)
 import Control.Monad.State.Class (get,put,gets)
 
 import Control.Monad (forever,replicateM,forM,when)
-import Control.Error (runEitherT)
 import Data.Monoid (mconcat)
 
 data Program = Program {
@@ -127,8 +126,8 @@ gui = start (do
                 atomically (send programChangedO imagequerystatements)
                 return ()
             sink (ResponseRunProgram inputpath imagequerystatements) = do
-                result <- run inputpath imagequerystatements
-                putStrLn (either id (const "Run finished!") result)
+                run inputpath imagequerystatements
+                putStrLn "Run finished!"
             sink (ResponseInputPath inputpath) = do
                 atomically (send inputPathChangedO inputpath)
                 return ()
@@ -365,13 +364,10 @@ stencilControl = StatementControl "Stencil" (\parentPanel -> do
             case maybeFilepath of
                 Nothing -> return (SetImageQueryParameter (StencilImage "" Nothing))
                 Just filepath -> do
-                    eitherJuicyImage <- runEitherT (loadImage filepath)
-                    case eitherJuicyImage of
-                        Left _ -> return (SetImageQueryParameter (StencilImage "" Nothing))
-                        Right juicyImage ->
-                            return (SetImageQueryParameter (
+                    image <- loadImage filepath
+                    return (SetImageQueryParameter (
                                 StencilImage filepath (Just (
-                                    binarize 0 (chooseChannel red (juicyToImage juicyImage))))))
+                                    binarize 0 (chooseChannel red (juicyToImage image))))))
     return ([],getStatement))
 
 thresholdControl :: StatementControl

@@ -25,29 +25,28 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (evalStateT,get,put)
 
-import Control.Error (EitherT,runEitherT,scriptIO,fmapLT)
-
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>),(<.>),takeBaseName,dropFileName)
-import System.IO (Handle,hPutStrLn,openFile,hClose,IOMode(WriteMode),hFlush)
+import System.IO (
+    Handle,hPutStrLn,withFile,IOMode(WriteMode),hSetBuffering,BufferMode(LineBuffering))
 
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 
-run :: FilePath -> [ImageQueryStatement] -> IO (Either String ())
-run inputdirectory imagequerystatements = runEitherT (do
+run :: FilePath -> [ImageQueryStatement] -> IO ()
+run inputdirectory imagequerystatements = do
     let inputbasename = takeBaseName inputdirectory
         resultsPath = "results" </> inputbasename
-    scriptIO (createDirectoryIfMissing True resultsPath)
-    tablehandle <- scriptIO (openFile (resultsPath </> "table" <.> "csv") WriteMode)
-    scriptIO (hPutStrLn tablehandle (csvRow (tableHeader imagequerystatements)) >> hFlush tablehandle)
-    runEffect (
-        imageSeries inputdirectory >->
-        Pipes.mapM (\(imagepath,image) -> do
-            imagequeryresult <- runImageQueries imagequerystatements image
-            return (imagepath,imagequeryresult)) >->
-        consumeResults resultsPath tablehandle) `onFailure` show
-    scriptIO (hClose tablehandle))
+    createDirectoryIfMissing True resultsPath
+    withFile (resultsPath </> "table" <.> "csv") WriteMode (\tablehandle -> do
+        hSetBuffering tablehandle LineBuffering
+        hPutStrLn tablehandle (csvRow (tableHeader imagequerystatements))
+        runEffect (
+            imageSeries inputdirectory >->
+            Pipes.mapM (\(imagepath,image) -> do
+                imagequeryresult <- runImageQueries imagequerystatements image
+                return (imagepath,imagequeryresult)) >->
+            consumeResults resultsPath tablehandle))
 
 lineImagePath :: Int -> FilePath
 lineImagePath i = "lineimage-" ++ show i ++ ".bmp"
@@ -114,13 +113,9 @@ saveLineImages resultsPath lineimages = forM_ (zip [0..] lineimages) (\(i,lineim
     writeBitmap (resultsPath </> lineImagePath i) (imageToJuicy lineimage))
 
 saveTableRow :: FilePath -> Handle -> [Double] -> IO ()
-saveTableRow imagebasename tablehandle tablerow = do
-    let entries = [imagebasename] ++ map show tablerow
-    hPutStrLn tablehandle (csvRow entries)
-    hFlush tablehandle
+saveTableRow imagebasename tablehandle tablerow = hPutStrLn tablehandle (csvRow entries) where
+    entries = [imagebasename] ++ map show tablerow
+    
 
 csvRow :: [String] -> String
 csvRow = intercalate "\t"
-
-onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
-onFailure = flip fmapLT
