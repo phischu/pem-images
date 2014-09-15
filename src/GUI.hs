@@ -365,11 +365,14 @@ stencilControl = StatementControl "Stencil" (\parentPanel -> do
                 [("Image Files",["*.png","*.bmp","*.gif"])] "" ""
             case maybeFilepath of
                 Nothing -> return (SetImageQueryParameter (StencilImage "" Nothing))
-                Just filepath -> do
+                Just filepath -> catch (do
                     image <- loadImage filepath
                     return (SetImageQueryParameter (
                                 StencilImage filepath (Just (
-                                    binarize 0 (chooseChannel red (juicyToImage image))))))
+                                    binarize 0 (chooseChannel red (juicyToImage image)))))))
+                    (\e -> do
+                        errorDialog parentPanel "Loading Stencil Failed!" (show (e :: SomeException))
+                        return (SetImageQueryParameter (StencilImage "" Nothing)))
     return ([],getStatement))
 
 thresholdControl :: StatementControl
