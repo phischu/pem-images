@@ -140,32 +140,34 @@ setImageQueryParameter (Polarity polarity) =
 
 getImageQueryOutput :: Image RGB -> ImageQueryParameters -> ImageQuery -> ImageQueryOutput
 getImageQueryOutput image imagequeryparameters imagequery =
-    let (grayimage,islandimage) = prepareImage imagequeryparameters image
+    let (grayimage,islandimage,numberofislands) = prepareImage imagequeryparameters image
     in case imagequery of
-        TableQuery tablequery -> runTableQuery grayimage islandimage tablequery
-        ImageOfAverage -> AverageImage grayimage
-        LineImage Horizontal x y l -> ImageLine (horizontalLine x y l grayimage)
-        LineImage Vertical x y l -> ImageLine (verticalLine x y l grayimage)
-        IslandImage -> OutputImage imagequeryparameters (blackAndWhite islandimage)
-        AreaHistogram binsize power -> Histogram imagequeryparameters binsize power histogram where
-            histogram = areaHistogram binsize (runPowerFunction power) islandimage
+        ImageOfAverage ->
+            AverageImage grayimage
+        LineImage Horizontal x y l ->
+            ImageLine (horizontalLine x y l grayimage)
+        LineImage Vertical x y l ->
+            ImageLine (verticalLine x y l grayimage)
+        IslandImage -> 
+            OutputImage imagequeryparameters (blackAndWhite islandimage)
+        AreaHistogram binsize power ->
+            Histogram imagequeryparameters binsize power histogram where
+                histogram = areaHistogram binsize (runPowerFunction power) islandimage
+        TableQuery (ValueInPoint x y) ->
+            TableValue (fromIntegral (valueInPoint x y grayimage))
+        TableQuery (AverageAroundPoint x y r) ->
+            TableValue (averageAroundPoint x y r grayimage)
+        TableQuery AverageOfImage ->
+            TableValue (averageOfImage grayimage)
+        TableQuery (IslandQuery NumberOfIslands) ->
+            TableValue numberofislands
+        TableQuery (IslandQuery AverageAreaOfIslands) ->
+            TableValue (numberOfTruePixels islandimage / numberofislands)
+        TableQuery (IslandQuery AverageOutlineOfIslands) ->
+            TableValue (numberOfOutlinePixels islandimage / numberofislands)
 
-runTableQuery :: Image Word8 -> Image Bool -> TableQuery -> ImageQueryOutput
-runTableQuery grayimage _ (ValueInPoint x y) = TableValue (fromIntegral (valueInPoint x y grayimage))
-runTableQuery grayimage _ (AverageAroundPoint x y r) = TableValue (averageAroundPoint x y r grayimage)
-runTableQuery grayimage _ AverageOfImage = TableValue (averageOfImage grayimage)
-runTableQuery _ islandimage (IslandQuery islandquery) =
-    runIslandQuery islandimage islandquery
-
-runIslandQuery :: Image Bool -> IslandQuery -> ImageQueryOutput
-runIslandQuery binaryimage NumberOfIslands = TableValue (fromIntegral (numberOfIslands binaryimage))
-runIslandQuery binaryimage AverageAreaOfIslands = TableValue (
-    numberOfTruePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
-runIslandQuery binaryimage AverageOutlineOfIslands = TableValue (
-    numberOfOutlinePixels binaryimage / fromIntegral (numberOfIslands binaryimage))
-
-prepareImage :: ImageQueryParameters -> Image RGB -> (Image Word8,Image Bool)
-prepareImage imagequeryparameters image = (grayimage,islandimage) where
+prepareImage :: ImageQueryParameters -> Image RGB -> (Image Word8,Image Bool,Double)
+prepareImage imagequeryparameters image = (grayimage,islandimage,numberofislands) where
     grayimage = chooseChannel (runChannel (_channel imagequeryparameters)) image
     islandimage =
         maybe id cutOut (_subRect imagequeryparameters) (
@@ -173,6 +175,7 @@ prepareImage imagequeryparameters image = (grayimage,islandimage) where
                 runPolarity (_polarity imagequeryparameters) (
                     binarize (_threshold imagequeryparameters) (
                         smooth (_smoothing imagequeryparameters) grayimage))))
+    numberofislands = fromIntegral (numberOfIslands islandimage)
 
 runChannel :: Channel -> RGB -> Word8
 runChannel Red = red
