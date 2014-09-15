@@ -6,7 +6,8 @@ import ImageQuery (
     ImageQueryStatement,runImageQueries,
     ImageQueryParameters(_channel,_smoothing,_threshold,_polarity),
     ImageQueryResult(_averageImages,_imageLines,_outputImages,_tableRow,_histograms),
-    Power)
+    Power,
+    tableHeader)
 import ImageProcessing (
     Image,imageToJuicy,
     singleAverageImage,addImage,finalizeAverageImage,
@@ -39,6 +40,7 @@ run inputdirectory imagequerystatements = runEitherT (do
         resultsPath = "results" </> inputbasename
     scriptIO (createDirectoryIfMissing True resultsPath)
     tablehandle <- scriptIO (openFile (resultsPath </> "table" <.> "csv") WriteMode)
+    scriptIO (hPutStrLn tablehandle (csvRow (tableHeader imagequerystatements)) >> hFlush tablehandle)
     runEffect (
         imageSeries inputdirectory >->
         Pipes.mapM (\(imagepath,image) -> do
@@ -114,11 +116,11 @@ saveLineImages resultsPath lineimages = forM_ (zip [0..] lineimages) (\(i,lineim
 saveTableRow :: FilePath -> Handle -> [Double] -> IO ()
 saveTableRow imagebasename tablehandle tablerow = do
     let entries = [imagebasename] ++ map show tablerow
-    hPutStrLn tablehandle (intercalate "\t" entries)
+    hPutStrLn tablehandle (csvRow entries)
     hFlush tablehandle
 
-csvRow :: [Double] -> String
-csvRow = unwords . map show
+csvRow :: [String] -> String
+csvRow = intercalate "\t"
 
 onFailure :: (Monad m) => EitherT a m b -> (a -> c) -> EitherT c m b
 onFailure = flip fmapLT

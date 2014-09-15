@@ -10,7 +10,7 @@ import ImageProcessing (
 
 import Control.Monad.Trans.State.Strict (StateT,evalStateT,get,modify)
 import Data.Monoid (Monoid(..))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes,mapMaybe)
 import Control.Monad (forM)
 import Data.Foldable (foldMap)
 
@@ -190,3 +190,17 @@ runPowerFunction :: Power -> Int -> Int
 runPowerFunction One = id
 runPowerFunction OneOverTwo = round . (sqrt :: Double -> Double) . fromIntegral
 runPowerFunction ThreeOverTwo = round . (^(3 :: Int)) . (sqrt :: Double -> Double) . fromIntegral
+
+tableHeader :: [ImageQueryStatement] -> [String]
+tableHeader imagequerystatements = ["image_name"] ++ mapMaybe entryName imagequerystatements
+
+entryName :: ImageQueryStatement -> Maybe String
+entryName (GetImageQueryResult (TableQuery tablequery)) = Just (case tablequery of
+    ValueInPoint x y -> concat ["value_in_point_",show x,"_",show y]
+    AverageAroundPoint x y r -> concat ["average_around_point_",show x,"_",show y,"_",show r]
+    AverageOfImage -> "average_of_image"
+    IslandQuery islandquery -> case islandquery of
+        NumberOfIslands -> "number_of_islands"
+        AverageAreaOfIslands -> "average_area_of_islands"
+        AverageOutlineOfIslands -> "average_outline_of_islands")
+entryName _ = Nothing
