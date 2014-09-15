@@ -19,13 +19,13 @@ import Codec.Picture (Pixel8,writeBitmap)
 import Pipes (Consumer,runEffect,(>->),await)
 import qualified Pipes.Prelude as Pipes (mapM)
 
-import Control.Monad (forever)
+import Control.Monad (forever,filterM,(>=>))
 import Data.Foldable (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (MonadIO,liftIO)
 import Control.Monad.Trans.State (evalStateT,get,put)
 
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing,doesDirectoryExist)
 import System.FilePath ((</>),(<.>),takeBaseName,dropFileName)
 import System.IO (
     Handle,hPutStrLn,withFile,IOMode(WriteMode),hSetBuffering,BufferMode(LineBuffering))
@@ -36,7 +36,13 @@ import Data.List (intercalate)
 run :: FilePath -> [ImageQueryStatement] -> IO ()
 run inputdirectory imagequerystatements = do
     let inputbasename = takeBaseName inputdirectory
-        resultsPath = "results" </> inputbasename
+    (resultsPath:_) <- filterM (doesDirectoryExist >=> return . not) (do
+        let zero = 0 :: Int
+            nine = 9 :: Int
+        t <- [zero..nine]
+        h <- [zero..nine]
+        u <- [zero..nine]
+        return ("results" </> (inputbasename ++ show t ++ show h ++ show u)))
     createDirectoryIfMissing True resultsPath
     withFile (resultsPath </> "table" <.> "csv") WriteMode (\tablehandle -> do
         hSetBuffering tablehandle LineBuffering
