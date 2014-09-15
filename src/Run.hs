@@ -79,7 +79,7 @@ consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (fo
 
     liftIO (do
         saveIslandImages resultsPath imagebasename (_outputImages imagequeryresult)
-        saveTableRow tablehandle (_tableRow imagequeryresult)
+        saveTableRow imagebasename tablehandle (_tableRow imagequeryresult)
         forM_ (finalizeAverageImage maybeaverageimage' n') (saveAverageImage resultsPath)
         forM_ maybelineimages' (saveLineImages resultsPath)
         saveHistograms resultsPath imagebasename (_histograms imagequeryresult))))
@@ -111,8 +111,9 @@ saveLineImages :: FilePath -> [Image Pixel8] -> IO ()
 saveLineImages resultsPath lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
     writeBitmap (resultsPath </> lineImagePath i) (imageToJuicy lineimage))
 
-saveTableRow :: Handle -> [Double] -> IO ()
-saveTableRow tablehandle tablerow = hPutStrLn tablehandle (csvRow tablerow)
+saveTableRow :: FilePath -> Handle -> [Double] -> IO ()
+saveTableRow imagebasename tablehandle tablerow = hPutStrLn tablehandle (intercalate "\t" entries) where
+    entries = [imagebasename] ++ map show tablerow
 
 csvRow :: [Double] -> String
 csvRow = unwords . map show
