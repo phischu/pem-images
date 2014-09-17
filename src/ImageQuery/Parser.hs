@@ -11,7 +11,7 @@ import ImageQuery (
     Channel(Red,Green,Blue),
     Power(One,OneOverTwo,ThreeOverTwo))
 import Text.Parsec (
-    sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>),manyTill,anyChar)
+    sepEndBy,newline,choice,try,string,spaces,digit,many1,(<|>),many,noneOf)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM)
 
@@ -64,7 +64,7 @@ stencilParser :: Parser ImageQueryParameter
 stencilParser = do
     string "set_stencil"
     spaces
-    stencilFilePath <- manyTill anyChar newline
+    stencilFilePath <- many (noneOf ['\n'])
     return (StencilImage stencilFilePath Nothing)
 
 polarityParser :: Parser ImageQueryParameter
