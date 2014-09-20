@@ -25,7 +25,7 @@ import Graphics.UI.WX (
     fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,infoDialog,
     Prop((:=)),set,text,items,itemCount,sz,position,pt,selection,text,
     on,command,
-    Layout,layout,widget,row,column,minsize,boxed,
+    Layout,layout,widget,row,column,minsize,boxed,fill,
     panel,Panel,choice,entry,staticText,StaticText)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
@@ -149,7 +149,7 @@ gui = start (do
                 widget addStatementPanel,
                 boxed "Inputs" (row 5 [
                     widget inputPathButton,
-                    widget inputPathText])]]
+                    fill (widget inputPathText)])]]
 
     forkIO (runMVC (Program [] ".") model wx >> return ())
 
