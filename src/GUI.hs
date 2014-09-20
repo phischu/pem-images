@@ -299,6 +299,15 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
 
 data StatementControl = StatementControl String (Panel () -> IO ([Layout],IO ImageQueryStatement))
 
+numberEntry :: String -> Panel () -> IO ([Layout],IO Int)
+numberEntry name parentPanel = do
+    nEntry <- entry parentPanel [text := "0"]
+    let entryLayout = boxed name (widget nEntry)
+        getNumber = do
+            numberText <- Wx.get nEntry text
+            return (read numberText)
+    return ([entryLayout],getNumber)
+
 averageImageControl :: StatementControl
 averageImageControl = StatementControl "Average Image" (\_ -> do
     let getStatement = return (GetImageQueryResult ImageOfAverage)
@@ -312,20 +321,17 @@ islandImageControl = StatementControl "Island Image" (\_ -> do
 lineImageControl :: StatementControl
 lineImageControl = StatementControl "Line Image" (\parentPanel -> do
     orientationChoice <- choice parentPanel [items := ["Horizontal","Vertical"],selection := 0]
-    xEntry <- entry parentPanel [text := "0"]
-    yEntry <- entry parentPanel [text := "0"]
-    lEntry <- entry parentPanel [text := "0"]
+    (xLayout,getX) <- numberEntry "x" parentPanel
+    (yLayout,getY) <- numberEntry "y" parentPanel
+    (lLayout,getL) <- numberEntry "l" parentPanel
     let getStatement = do
             orientationSelection <- Wx.get orientationChoice selection
-            xText <- Wx.get xEntry text
-            yText <- Wx.get yEntry text
-            lText <- Wx.get lEntry text
+            x <- getX
+            y <- getY
+            l <- getL
             let orientation = if orientationSelection == 0 then Horizontal else Vertical
-                x = read xText
-                y = read yText
-                l = read lText
             return (GetImageQueryResult (LineImage orientation x y l))
-        layouts = [widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]
+        layouts = concat [[widget orientationChoice],xLayout,yLayout,lLayout]
     return (layouts,getStatement))
 
 areaHistogramControl :: StatementControl
