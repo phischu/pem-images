@@ -39,7 +39,8 @@ import Pipes (await,yield)
 import Control.Monad.State.Class (get,put,gets)
 
 import Control.Exception (catch,SomeException)
-import Control.Monad (forever,replicateM,forM,when)
+import Control.Monad (forever,when)
+import Control.Applicative (Applicative(pure,(<*>)),(<$>))
 import Data.Monoid (mconcat)
 
 data Program = Program {
@@ -249,9 +250,9 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
 
     addStatementPanel  <- panel parentFrame []
 
-    let createStatementPanel (StatementControl buttonText createOptions) = do
+    let createStatementPanel buttonText statementControl = do
             statementPanel <- panel addStatementPanel []
-            (optionLayouts,getStatement) <- createOptions statementPanel
+            (optionLayouts,getStatement) <- unStatementControl statementControl statementPanel
             let sendStatement = do
                     index <- Wx.get programListBox selection
                     statement <- getStatement
@@ -261,20 +262,20 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
             Wx.set statementPanel [layout := row 5 (widget statementButton:optionLayouts)]
             return statementPanel
 
-    averageImagePanel       <- createStatementPanel averageImageControl
-    islandImagePanel        <- createStatementPanel islandImageControl
-    lineImagePanel          <- createStatementPanel lineImageControl
-    areaHistogramPanel      <- createStatementPanel areaHistogramControl
-    channelPanel            <- createStatementPanel channelControl
-    subrectPanel            <- createStatementPanel subrectControl
-    stencilPanel            <- createStatementPanel stencilControl
-    thresholdPanel          <- createStatementPanel thresholdControl
-    smoothingPanel          <- createStatementPanel smoothingControl
-    polarityPanel           <- createStatementPanel polarityControl
-    valueInPointPanel       <- createStatementPanel valueInPointControl
-    averageAroundPointPanel <- createStatementPanel averageAroundPointControl
-    averageOfImagePanel     <- createStatementPanel averageOfImageControl
-    islandQueryPanel        <- createStatementPanel islandQueryControl
+    averageImagePanel       <- createStatementPanel "Average image" averageImageControl
+    islandImagePanel        <- createStatementPanel "Island images" islandImageControl
+    lineImagePanel          <- createStatementPanel "Line image" lineImageControl
+    areaHistogramPanel      <- createStatementPanel "Area histograms" areaHistogramControl
+    channelPanel            <- createStatementPanel "Channel" channelControl
+    subrectPanel            <- createStatementPanel "Subrect" subrectControl
+    stencilPanel            <- createStatementPanel "Stencil" stencilControl
+    thresholdPanel          <- createStatementPanel "Threshold" thresholdControl
+    smoothingPanel          <- createStatementPanel "Smoothing" smoothingControl
+    polarityPanel           <- createStatementPanel "Polarity" polarityControl
+    valueInPointPanel       <- createStatementPanel "Value in point" valueInPointControl
+    averageAroundPointPanel <- createStatementPanel "Average around point" averageAroundPointControl
+    averageOfImagePanel     <- createStatementPanel "Average of image" averageOfImageControl
+    islandQueryPanel        <- createStatementPanel "Island query" islandQueryControl
 
     Wx.set addStatementPanel [layout := column 5 [
         boxed "Parameters" (column 5 [
@@ -297,75 +298,62 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
 
     return addStatementPanel
 
-data StatementControl = StatementControl String (Panel () -> IO ([Layout],IO ImageQueryStatement))
+data StatementControl a = StatementControl {unStatementControl :: Panel () -> IO ([Layout],IO a)}
 
-averageImageControl :: StatementControl
-averageImageControl = StatementControl "Average Image" (\_ -> do
-    let getStatement = return (GetImageQueryResult ImageOfAverage)
-    return ([],getStatement))
+instance Functor StatementControl where
+    fmap function = StatementControl . fmap (fmap (fmap (fmap function))) . unStatementControl
 
-islandImageControl :: StatementControl
-islandImageControl = StatementControl "Island Image" (\_ -> do
-    let getStatement = return (GetImageQueryResult IslandImage)
-    return ([],getStatement))
+instance Applicative StatementControl where
+    pure value = StatementControl (const (return ([],return value)))
+    (<*>) functionStatementConstrol valueStatementConstrol = StatementControl (\parentPanel -> do
+        (functionLayouts,getFunction) <- unStatementControl functionStatementConstrol parentPanel
+        (valueLayouts,getValue) <- unStatementControl valueStatementConstrol parentPanel
+        return (functionLayouts ++ valueLayouts,do
+            function <- getFunction
+            value <- getValue
+            return (function value)))
 
-lineImageControl :: StatementControl
-lineImageControl = StatementControl "Line Image" (\parentPanel -> do
-    orientationChoice <- choice parentPanel [items := ["Horizontal","Vertical"],selection := 0]
-    xEntry <- entry parentPanel [text := "0"]
-    yEntry <- entry parentPanel [text := "0"]
-    lEntry <- entry parentPanel [text := "0"]
-    let getStatement = do
-            orientationSelection <- Wx.get orientationChoice selection
-            xText <- Wx.get xEntry text
-            yText <- Wx.get yEntry text
-            lText <- Wx.get lEntry text
-            let orientation = if orientationSelection == 0 then Horizontal else Vertical
-                x = read xText
-                y = read yText
-                l = read lText
-            return (GetImageQueryResult (LineImage orientation x y l))
-        layouts = [widget orientationChoice,widget xEntry,widget yEntry,widget lEntry]
-    return (layouts,getStatement))
+choiceControl :: [(String,a)] -> StatementControl a
+choiceControl = undefined
 
-areaHistogramControl :: StatementControl
-areaHistogramControl = StatementControl "Area Histogram" (\parentPanel -> do
-    binsizeEntry <- entry parentPanel [text := "1"]
-    powerChoice <- choice parentPanel [items := ["One","One over two","Three over two"],selection := 0]
-    let getStatement = do
-            binsizeText <- Wx.get binsizeEntry text
-            powerSelection <- Wx.get powerChoice selection
-            let binsize = read binsizeText
-                power = case powerSelection of
-                    0 -> One
-                    1 -> OneOverTwo
-                    2 -> ThreeOverTwo
-            return (GetImageQueryResult (AreaHistogram binsize power))
-        layouts = [widget binsizeEntry,widget powerChoice]
-    return (layouts,getStatement))
+numberControl :: (Num a) => StatementControl a
+numberControl = undefined
 
-channelControl :: StatementControl
-channelControl = StatementControl "Channel" (\parentPanel -> do
-    channelChoice <- choice parentPanel [items := ["Red","Green","Blue"],selection := 0]
-    let getStatement = do
-            channelSelection <- Wx.get channelChoice selection
-            let channelType = case channelSelection of
-                    0 -> Red
-                    1 -> Green
-                    2 -> Blue
-            return (SetImageQueryParameter (Channel channelType))
-    return ([widget channelChoice],getStatement))
+averageImageControl :: StatementControl ImageQueryStatement
+averageImageControl = pure (GetImageQueryResult ImageOfAverage)
 
-subrectControl :: StatementControl
-subrectControl = StatementControl "Subrect" (\parentPanel -> do
-    parameterEntries <- replicateM 4 (entry parentPanel [text := "0"])
-    let getStatement = do
-            [x,y,w,h] <- forM parameterEntries (\parameterEntry -> Wx.get parameterEntry text >>= return . read)
-            return (SetImageQueryParameter (SubRect (x,y,w,h)))
-    return (map widget parameterEntries,getStatement))
+islandImageControl :: StatementControl ImageQueryStatement
+islandImageControl = pure (GetImageQueryResult IslandImage)
 
-stencilControl :: StatementControl
-stencilControl = StatementControl "Stencil" (\parentPanel -> do
+lineImageControl :: StatementControl ImageQueryStatement
+lineImageControl =
+    (\orientation x y l -> GetImageQueryResult (LineImage orientation x y l)) <$>
+    choiceControl [("Horizontal",Horizontal),("Vertical",Vertical)] <*>
+    numberControl <*>
+    numberControl <*>
+    numberControl
+
+areaHistogramControl :: StatementControl ImageQueryStatement
+areaHistogramControl = 
+    (\binsize power -> GetImageQueryResult (AreaHistogram binsize power)) <$>
+    numberControl <*>
+    choiceControl [("One",One),("One over two",OneOverTwo),("Three over two",ThreeOverTwo)]
+
+channelControl :: StatementControl ImageQueryStatement
+channelControl =
+    SetImageQueryParameter . Channel <$>
+    choiceControl [("Red",Red),("Green",Green),("Blue",Blue)]
+
+subrectControl :: StatementControl ImageQueryStatement
+subrectControl =
+    (\x y w h -> SetImageQueryParameter (SubRect (x,y,w,h))) <$>
+    numberControl <*>
+    numberControl <*>
+    numberControl <*>
+    numberControl
+
+stencilControl :: StatementControl ImageQueryStatement
+stencilControl = StatementControl (\parentPanel -> do
     let getStatement = do
             maybeFilepath <- fileOpenDialog
                 parentPanel True True "Stencil Image"
@@ -382,66 +370,42 @@ stencilControl = StatementControl "Stencil" (\parentPanel -> do
                         return (SetImageQueryParameter (StencilImage "" Nothing)))
     return ([],getStatement))
 
-thresholdControl :: StatementControl
-thresholdControl = StatementControl "Threshold" (\parentPanel -> do
-    thresholdEntry <- entry parentPanel [text := "0"]
-    let getStatement = do
-            thresholdText <- Wx.get thresholdEntry text
-            return (SetImageQueryParameter (Threshold (read thresholdText)))
-    return ([widget thresholdEntry],getStatement))
+thresholdControl :: StatementControl ImageQueryStatement
+thresholdControl =
+    SetImageQueryParameter . Threshold <$>
+    numberControl
 
-smoothingControl :: StatementControl
-smoothingControl = StatementControl "Smoothing" (\parentPanel -> do
-    smoothingEntry <- entry parentPanel [text := "0"]
-    let getStatement = do
-            smoothingText <- Wx.get smoothingEntry text
-            return (SetImageQueryParameter (Smoothing (read smoothingText)))
-    return ([widget smoothingEntry],getStatement))
+smoothingControl :: StatementControl ImageQueryStatement
+smoothingControl =
+    SetImageQueryParameter . Smoothing <$>
+    numberControl
 
-polarityControl :: StatementControl
-polarityControl = StatementControl "Polarity" (\parentPanel -> do
-    polarityChoice <- choice parentPanel [items := ["Dark","Bright"],selection := 0]
-    let getStatement = do
-            polaritySelection <- Wx.get polarityChoice selection
-            let polarity = case polaritySelection of
-                    0 -> Dark
-                    1 -> Bright
-            return (SetImageQueryParameter (Polarity polarity))
-    return ([widget polarityChoice],getStatement))
+polarityControl :: StatementControl ImageQueryStatement
+polarityControl =
+    SetImageQueryParameter . Polarity <$>
+    choiceControl [("Dark",Dark),("Bright",Bright)]
 
-valueInPointControl :: StatementControl
-valueInPointControl = StatementControl "Value in Point" (\parentPanel -> do
-    [xEntry,yEntry] <- replicateM 2 (entry parentPanel [text := "0"])
-    let getStatement = do
-            xText <- Wx.get xEntry text
-            yText <- Wx.get yEntry text
-            return (GetImageQueryResult (TableQuery (ValueInPoint (read xText) (read yText))))
-    return (map widget [xEntry,yEntry],getStatement))
+valueInPointControl :: StatementControl ImageQueryStatement
+valueInPointControl =
+    (\x y -> GetImageQueryResult (TableQuery (ValueInPoint x y))) <$>
+    numberControl <*>
+    numberControl
 
-averageAroundPointControl :: StatementControl
-averageAroundPointControl = StatementControl "Average Around Point" (\parentPanel -> do
-    [xEntry,yEntry,rEntry] <- replicateM 3 (entry parentPanel [text := "0"])
-    let getStatement = do
-            xText <- Wx.get xEntry text
-            yText <- Wx.get yEntry text
-            rText <- Wx.get rEntry text
-            return (GetImageQueryResult (TableQuery (AverageAroundPoint (read xText) (read yText) (read rText))))
-    return (map widget [xEntry,yEntry,rEntry],getStatement))
+averageAroundPointControl :: StatementControl ImageQueryStatement
+averageAroundPointControl =
+    (\x y r -> GetImageQueryResult (TableQuery (AverageAroundPoint x y r))) <$>
+    numberControl <*>
+    numberControl <*>
+    numberControl
 
-averageOfImageControl :: StatementControl
-averageOfImageControl = StatementControl "Average Of Image" (\_ -> do
-    let getStatement = return (GetImageQueryResult (TableQuery AverageOfImage))
-    return ([],getStatement))
+averageOfImageControl :: StatementControl ImageQueryStatement
+averageOfImageControl = pure (GetImageQueryResult (TableQuery AverageOfImage))
 
-islandQueryControl :: StatementControl
-islandQueryControl = StatementControl "Island Query" (\parentPanel -> do
-    islandQueryChoice <- choice parentPanel [items := ["Number","Average Area","Average Outline"],selection := 0]
-    let getStatement = do
-            islandQuerySelection <- Wx.get islandQueryChoice selection
-            let islandQuery = case islandQuerySelection of
-                    0 -> NumberOfIslands
-                    1 -> AverageAreaOfIslands
-                    2 -> AverageOutlineOfIslands
-            return (GetImageQueryResult (TableQuery (IslandQuery islandQuery)))
-    return ([widget islandQueryChoice],getStatement))
+islandQueryControl :: StatementControl ImageQueryStatement
+islandQueryControl =
+    GetImageQueryResult . TableQuery . IslandQuery <$>
+    choiceControl [
+        ("Number",NumberOfIslands),
+        ("Average area",AverageAreaOfIslands),
+        ("Average outline",AverageOutlineOfIslands)]
 
