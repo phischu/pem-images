@@ -314,7 +314,12 @@ instance Applicative StatementControl where
             return (function value)))
 
 choiceControl :: [(String,a)] -> StatementControl a
-choiceControl = undefined
+choiceControl choices = StatementControl (\parentPanel -> do
+    c <- choice parentPanel [items := map fst choices,selection := 0]
+    let getChoice = do
+            s <- Wx.get c selection
+            return (map snd choices !! s)
+    return ([widget c],getChoice))
 
 numberControl :: (Num a) => StatementControl a
 numberControl = undefined
