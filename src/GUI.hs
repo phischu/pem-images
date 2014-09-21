@@ -321,8 +321,13 @@ choiceControl choices = StatementControl (\parentPanel -> do
             return (map snd choices !! s)
     return ([widget c],getChoice))
 
-numberControl :: (Num a) => StatementControl a
-numberControl = undefined
+numberControl :: (Read a) => StatementControl a
+numberControl = StatementControl (\parentPanel -> do
+    e <- entry parentPanel [text := "0"]
+    let getNumber = do
+            n <- Wx.get e text
+            return (read n)
+    return ([widget e],getNumber))
 
 averageImageControl :: StatementControl ImageQueryStatement
 averageImageControl = pure (GetImageQueryResult ImageOfAverage)
