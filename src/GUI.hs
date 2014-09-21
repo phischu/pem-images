@@ -25,7 +25,7 @@ import Graphics.UI.WX (
     fileSaveDialog,fileOpenDialog,errorDialog,dirOpenDialog,infoDialog,
     Prop((:=)),set,text,items,itemCount,sz,position,pt,selection,text,
     on,command,
-    Layout,layout,widget,row,column,minsize,boxed,fill,
+    Layout,layout,widget,row,column,minsize,boxed,fill,label,
     panel,Panel,choice,entry,staticText,StaticText)
 import qualified  Graphics.UI.WX as Wx (get,set)
 
@@ -40,7 +40,7 @@ import Control.Monad.State.Class (get,put,gets)
 
 import Control.Exception (catch,SomeException)
 import Control.Monad (forever,when)
-import Control.Applicative (Applicative(pure,(<*>)),(<$>))
+import Control.Applicative (Applicative(pure,(<*>)),(<$>),(*>))
 import Data.Monoid (mconcat)
 
 data Program = Program {
@@ -329,6 +329,10 @@ numberControl = StatementControl (\parentPanel -> do
             return (read n)
     return ([widget e],getNumber))
 
+tag :: String -> StatementControl ()
+tag name = StatementControl (\_ -> do
+    return ([label name],return ()))
+
 averageImageControl :: StatementControl ImageQueryStatement
 averageImageControl = pure (GetImageQueryResult ImageOfAverage)
 
@@ -338,16 +342,16 @@ islandImageControl = pure (GetImageQueryResult IslandImage)
 lineImageControl :: StatementControl ImageQueryStatement
 lineImageControl =
     (\orientation x y l -> GetImageQueryResult (LineImage orientation x y l)) <$>
-    choiceControl [("Horizontal",Horizontal),("Vertical",Vertical)] <*>
-    numberControl <*>
-    numberControl <*>
-    numberControl
+    (tag "orientation:" *> choiceControl [("Horizontal",Horizontal),("Vertical",Vertical)]) <*>
+    (tag "start x:" *> numberControl) <*>
+    (tag "start y:" *> numberControl) <*>
+    (tag "length:" *> numberControl)
 
 areaHistogramControl :: StatementControl ImageQueryStatement
 areaHistogramControl = 
     (\binsize power -> GetImageQueryResult (AreaHistogram binsize power)) <$>
-    numberControl <*>
-    choiceControl [("One",One),("One over two",OneOverTwo),("Three over two",ThreeOverTwo)]
+    (tag "bin size:" *> numberControl) <*>
+    (tag "exponent" *> choiceControl [("One",One),("One over two",OneOverTwo),("Three over two",ThreeOverTwo)])
 
 channelControl :: StatementControl ImageQueryStatement
 channelControl =
@@ -357,10 +361,10 @@ channelControl =
 subrectControl :: StatementControl ImageQueryStatement
 subrectControl =
     (\x y w h -> SetImageQueryParameter (SubRect (x,y,w,h))) <$>
-    numberControl <*>
-    numberControl <*>
-    numberControl <*>
-    numberControl
+    (tag "upper left x:" *> numberControl) <*>
+    (tag "upper left y:" *> numberControl) <*>
+    (tag "width" *> numberControl) <*>
+    (tag "height" *> numberControl)
 
 stencilControl :: StatementControl ImageQueryStatement
 stencilControl = StatementControl (\parentPanel -> do
@@ -388,7 +392,7 @@ thresholdControl =
 smoothingControl :: StatementControl ImageQueryStatement
 smoothingControl =
     SetImageQueryParameter . Smoothing <$>
-    numberControl
+    (tag "half width:" *> numberControl)
 
 polarityControl :: StatementControl ImageQueryStatement
 polarityControl =
@@ -398,15 +402,15 @@ polarityControl =
 valueInPointControl :: StatementControl ImageQueryStatement
 valueInPointControl =
     (\x y -> GetImageQueryResult (TableQuery (ValueInPoint x y))) <$>
-    numberControl <*>
-    numberControl
+    (tag "x:" *> numberControl) <*>
+    (tag "y:" *> numberControl)
 
 averageAroundPointControl :: StatementControl ImageQueryStatement
 averageAroundPointControl =
     (\x y r -> GetImageQueryResult (TableQuery (AverageAroundPoint x y r))) <$>
-    numberControl <*>
-    numberControl <*>
-    numberControl
+    (tag "x:" *> numberControl) <*>
+    (tag "y:" *> numberControl) <*>
+    (tag "half width:" *> numberControl)
 
 averageOfImageControl :: StatementControl ImageQueryStatement
 averageOfImageControl = pure (GetImageQueryResult (TableQuery AverageOfImage))
