@@ -173,7 +173,7 @@ finalizeAverageImage (Just image) n
 
 areaHistogram :: Int -> (Int -> Int) -> Image Bool -> [(Int,Int)]
 areaHistogram binsize powerfunction islandimage = Map.toList histogram where
-    histogram = Map.fromListWith (+) (zip values (repeat 1))
+    histogram = Map.fromListWith (+) (zip (map ((*) binsize) values) (repeat 1))
     values = map binning (Map.elems (labelMap (labelArray islandimage)))
     binning area = powerfunction area `div` binsize
 
