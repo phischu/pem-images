@@ -102,7 +102,7 @@ saveIslandImages resultsPath imagebasename islandimages = forM_ islandimages (\(
         
 saveHistograms :: FilePath -> FilePath -> [(ImageQueryParameters,Int,Power,[(Int,Int)])] -> IO ()
 saveHistograms resultsPath imagebasename histograms = forM_ histograms (\(imagequeryparameters,binsize,power,histogram) -> do
-    let histogramRow r v = show r ++ " " ++ show v
+    let histogramRow r v = csvRow [show r,show v]
         histogrampath =
             resultsPath </> "histograms" </>
             parametersPath imagequeryparameters </>
