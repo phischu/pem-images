@@ -23,8 +23,10 @@ imageSeries seriespath =
         return (imagepath,juicyToImage image))
 
 data ImageLoadingError =
-    ReadImageError String |
-    ImageFormatError deriving (Show,Typeable)
+    ImageLoadingError String String deriving (Typeable)
+
+instance Show ImageLoadingError where
+    show (ImageLoadingError imagepath message) = "Error loading " ++ imagepath ++ ":\n" ++ message
 
 instance Exception ImageLoadingError
 
@@ -37,9 +39,9 @@ loadImage :: FilePath -> IO (Juicy.Image Juicy.PixelRGB8)
 loadImage imagepath = do
     eitherdynamicimage <- readImage imagepath
     case eitherdynamicimage of
-        Left readimageerror -> throw (ReadImageError readimageerror)
+        Left readimageerror -> throw (ImageLoadingError imagepath readimageerror)
         Right (ImageRGB8 image) -> return image
         Right (ImageY8 image) -> return (promoteImage image)
         Right (ImageYCbCr8 image) -> return (convertImage image)
-        _ -> throw ImageFormatError
+        _ -> throw (ImageLoadingError imagepath "unsupported image format")
 
