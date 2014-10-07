@@ -1,7 +1,7 @@
 module Run where
 
 import ImageLoading (
-    imageSeries)
+    imageSeries,filesInDirectory)
 import ImageQuery (
     ImageQueryStatement,runImageQueries,
     ImageQueryParameters(_channel,_smoothing,_threshold,_polarity),
@@ -17,7 +17,7 @@ import ImageQuery.Printer (channelPrinter,polarityPrinter,powerPrinter)
 import Codec.Picture (Pixel8,writeBitmap)
 
 import Pipes (Consumer,runEffect,(>->),await)
-import qualified Pipes.Prelude as Pipes (mapM)
+import qualified Pipes.Prelude as Pipes (mapM,length)
 
 import Control.Monad (forever,filterM,(>=>))
 import Data.Foldable (forM_)
@@ -33,8 +33,8 @@ import System.IO (
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 
-run :: FilePath -> [ImageQueryStatement] -> IO ()
-run inputdirectory imagequerystatements = do
+run :: (Int -> IO ()) -> FilePath -> [ImageQueryStatement] -> IO ()
+run progress inputdirectory imagequerystatements = do
     let inputbasename = takeBaseName inputdirectory
     (resultsPath:_) <- filterM (doesDirectoryExist >=> return . not) (do
         let zero = 0 :: Int
@@ -52,7 +52,7 @@ run inputdirectory imagequerystatements = do
             Pipes.mapM (\(imagepath,image) -> do
                 imagequeryresult <- runImageQueries imagequerystatements image
                 return (imagepath,imagequeryresult)) >->
-            consumeResults resultsPath tablehandle))
+            consumeResults progress resultsPath tablehandle))
 
 lineImagePath :: Int -> FilePath
 lineImagePath i = "lineimage-" ++ show i ++ ".bmp"
@@ -64,8 +64,11 @@ parametersPath imagequeryparameters = intercalate "-" [
     show (_threshold imagequeryparameters),
     polarityPrinter (_polarity imagequeryparameters)]
 
-consumeResults :: FilePath -> Handle -> Consumer (FilePath,ImageQueryResult) IO r
-consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
+numberOfImages :: FilePath -> IO Int
+numberOfImages filepath = Pipes.length (filesInDirectory filepath)
+
+consumeResults :: (Int -> IO ()) -> FilePath -> Handle -> Consumer (FilePath,ImageQueryResult) IO r
+consumeResults progress resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
 
     (imagepath,imagequeryresult) <- lift await
     (n,maybeaverageimage,maybelineimages) <- get
@@ -89,7 +92,8 @@ consumeResults resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (fo
         saveTableRow imagebasename tablehandle (_tableRow imagequeryresult)
         forM_ (finalizeAverageImage maybeaverageimage' n') (saveAverageImage resultsPath)
         forM_ maybelineimages' (saveLineImages resultsPath)
-        saveHistograms resultsPath imagebasename (_histograms imagequeryresult))))
+        saveHistograms resultsPath imagebasename (_histograms imagequeryresult)
+        progress n')))
 
 saveIslandImages :: FilePath -> FilePath -> [(ImageQueryParameters,Image Pixel8)] -> IO ()
 saveIslandImages resultsPath imagebasename islandimages = forM_ islandimages (\(imagequeryparameters,islandimage) -> do

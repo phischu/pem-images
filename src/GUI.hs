@@ -1,6 +1,6 @@
 module GUI where
 
-import Run (run)
+import Run (run,numberOfImages)
 import ImageQuery (
     ImageQueryStatement(GetImageQueryResult,SetImageQueryParameter),
     ImageQuery(ImageOfAverage,IslandImage,LineImage,TableQuery,AreaHistogram),
@@ -118,6 +118,7 @@ gui = start (do
     inputPathButton       <- createInputPathButton parentFrame changeInputPathO
     inputPathText         <- createInputPathText parentFrame inputPathChangedI
     deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
+    progressText          <- staticText parentFrame [text := "Waiting"]
 
     let wx = managed (\k -> let
 
@@ -129,7 +130,8 @@ gui = start (do
                 atomically (send programChangedO imagequerystatements)
                 return ()
             sink (ResponseRunProgram inputpath imagequerystatements) = do
-                catch (run inputpath imagequerystatements) (\e ->
+                n <- numberOfImages inputpath
+                catch (run (\i -> progress i n) inputpath imagequerystatements) (\e ->
                     errorDialog parentFrame "Error during run" (show (e :: SomeException)))
                 infoDialog parentFrame "Run finished!" "Success!"
             sink (ResponseInputPath inputpath) = do
@@ -137,6 +139,7 @@ gui = start (do
                 return ()
 
             in k (asSink sink,asInput (mconcat inputs)))
+        progress i n = Wx.set progressText [text := "Running: " ++ show i ++ "/" ++ show n]
 
         frameLayout = row 5 [
             column 5 [
@@ -145,7 +148,8 @@ gui = start (do
                     widget deleteStatementButton,
                     widget loadProgramButton,
                     widget saveProgramButton,
-                    widget runProgramButton]],
+                    widget runProgramButton],
+                widget progressText],
             column 5 [
                 widget addStatementPanel,
                 boxed "Inputs" (row 5 [
