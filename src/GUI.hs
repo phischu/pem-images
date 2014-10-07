@@ -108,6 +108,7 @@ gui = start (do
     (changeInputPathO,changeInputPathI)   <- spawn Single
     (inputPathChangedO,inputPathChangedI) <- spawn Single
     (deleteStatementO,deleteStatementI)   <- spawn Single
+    (progressO,progressI)                 <- spawn Single
 
     parentFrame           <- frame [text := "Image Processing",position := pt 100 100]
     saveProgramButton     <- createSaveProgramButton parentFrame saveProgramO
@@ -118,7 +119,7 @@ gui = start (do
     inputPathButton       <- createInputPathButton parentFrame changeInputPathO
     inputPathText         <- createInputPathText parentFrame inputPathChangedI
     deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
-    progressText          <- staticText parentFrame [text := "Waiting"]
+    progressText          <- createProgressText parentFrame progressI
 
     let wx = managed (\k -> let
 
@@ -139,7 +140,7 @@ gui = start (do
                 return ()
 
             in k (asSink sink,asInput (mconcat inputs)))
-        progress i n = Wx.set progressText [text := "Running: " ++ show i ++ "/" ++ show n]
+        progress i n = atomically (send progressO (i,n)) >> return ()
 
         frameLayout = row 5 [
             column 5 [
@@ -248,6 +249,16 @@ createInputPathText parentFrame inputPathChangedI = do
             Nothing -> return ()
             Just inputpath -> Wx.set inputPathText [text := inputpath]))
     return inputPathText
+
+createProgressText :: Frame () -> Input (Int,Int) -> IO (StaticText ())
+createProgressText parentFrame progressI = do
+    progressText <- staticText parentFrame [text := "Waiting"]
+    forkIO (forever (do
+        maybeProgress <- atomically (recv progressI)
+        case maybeProgress of
+            Nothing -> return ()
+            Just (i,n) -> Wx.set progressText [text := "Running: " ++ show i ++ "/" ++ show n]))
+    return progressText
 
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
