@@ -33,6 +33,8 @@ import System.IO (
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 
+-- | Actually run the given statements on all images in the given filepath
+-- reporting progress with the given function.
 run :: (Int -> IO ()) -> FilePath -> [ImageQueryStatement] -> IO ()
 run progress inputdirectory imagequerystatements = do
     let inputbasename = takeBaseName inputdirectory
@@ -54,9 +56,11 @@ run progress inputdirectory imagequerystatements = do
                 return (imagepath,imagequeryresult)) >->
             consumeResults progress resultsPath tablehandle))
 
+-- | Path where the line images for the i'th line image statement are stored.
 lineImagePath :: Int -> FilePath
 lineImagePath i = "lineimage-" ++ show i ++ ".bmp"
 
+-- | Create a path from the given parameters.
 parametersPath :: ImageQueryParameters -> FilePath
 parametersPath imagequeryparameters = intercalate "-" [
     channelPrinter (_channel imagequeryparameters),
@@ -64,9 +68,12 @@ parametersPath imagequeryparameters = intercalate "-" [
     show (_threshold imagequeryparameters),
     polarityPrinter (_polarity imagequeryparameters)]
 
+-- | Number of files in the given folder.
 numberOfImages :: FilePath -> IO Int
 numberOfImages filepath = Pipes.length (filesInDirectory filepath)
 
+-- | Take a progress reporting function, a path to store the results and the handle
+-- of an open table file and give a consumer for pairs of paths and results.
 consumeResults :: (Int -> IO ()) -> FilePath -> Handle -> Consumer (FilePath,ImageQueryResult) IO r
 consumeResults progress resultsPath tablehandle = flip evalStateT (0,Nothing,Nothing) (forever (do
 
@@ -95,6 +102,8 @@ consumeResults progress resultsPath tablehandle = flip evalStateT (0,Nothing,Not
         saveHistograms resultsPath imagebasename (_histograms imagequeryresult)
         progress n')))
 
+-- | Write the given intermediate island images to the given path using the given
+-- original image name.
 saveIslandImages :: FilePath -> FilePath -> [(ImageQueryParameters,Image Pixel8)] -> IO ()
 saveIslandImages resultsPath imagebasename islandimages = forM_ islandimages (\(imagequeryparameters,islandimage) -> do
     let islandimagepath =
@@ -103,7 +112,8 @@ saveIslandImages resultsPath imagebasename islandimages = forM_ islandimages (\(
             imagebasename <.> "bmp"
     createDirectoryIfMissing True (dropFileName islandimagepath)
     writeBitmap islandimagepath (imageToJuicy islandimage)) where
-        
+
+-- | Save the given histograms to the given path using the given original image name.
 saveHistograms :: FilePath -> FilePath -> [(ImageQueryParameters,Int,Power,[(Int,Int)])] -> IO ()
 saveHistograms resultsPath imagebasename histograms = forM_ histograms (\(imagequeryparameters,binsize,power,histogram) -> do
     let histogramRow r v = csvRow [show r,show v]
@@ -115,17 +125,21 @@ saveHistograms resultsPath imagebasename histograms = forM_ histograms (\(imageq
     createDirectoryIfMissing True (dropFileName histogrampath)
     writeFile histogrampath (unlines (map (uncurry histogramRow) histogram)))
 
+-- | Save an average image to the given path.
 saveAverageImage :: FilePath -> Image Pixel8 -> IO ()
 saveAverageImage resultsPath = writeBitmap (resultsPath </> "averageimage" <.> "bmp") . imageToJuicy
 
+-- | Save a list of line image to the given path.
 saveLineImages :: FilePath -> [Image Pixel8] -> IO ()
 saveLineImages resultsPath lineimages = forM_ (zip [0..] lineimages) (\(i,lineimage) -> do
     writeBitmap (resultsPath </> lineImagePath i) (imageToJuicy lineimage))
 
+-- | Write out the given table row to the given handle using the given
+-- original image name.
 saveTableRow :: FilePath -> Handle -> [Double] -> IO ()
 saveTableRow imagebasename tablehandle tablerow = hPutStrLn tablehandle (csvRow entries) where
     entries = [imagebasename] ++ map show tablerow
-    
 
+-- | A single csv row. Tab separated.
 csvRow :: [String] -> String
 csvRow = intercalate "\t"

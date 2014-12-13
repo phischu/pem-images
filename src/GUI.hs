@@ -43,26 +43,43 @@ import Control.Monad (forever,when)
 import Control.Applicative (Applicative(pure,(<*>)),(<$>),(*>))
 import Data.Monoid (mconcat)
 
+-- | The state of the application is a program to be run.
 data Program = Program {
     imageQueryStatements :: [ImageQueryStatement],
+    -- ^ The list of statements to be run.
     inputPath :: InputPath}
+    -- ^ The path where the input images are from.
 
+-- | User requests.
 data Request =
     RequestSaveProgram FilePath |
+    -- ^ Save the program to the location.
     RequestLoadProgram [ImageQueryStatement] |
+    -- ^ Replace the current program with the list of statements.
     RequestRunProgram |
+    -- ^ Run the current program.
     RequestAddStatement Int ImageQueryStatement |
+    -- ^ Insert the statement at the position into the current list of statements.
     RequestInputPath InputPath |
+    -- ^ Change the input path.
     RequestDeleteStatement Int
+    -- ^ Delete the statement.
 
+-- | Actions on the outside world.
 data Response =
     ResponseSaveProgram FilePath [ImageQueryStatement] |
+    -- ^ Save the list of statements to the path.
     ResponseProgramChanged [ImageQueryStatement] |
+    -- ^ Update the GUI because the program has changed.
     ResponseRunProgram InputPath [ImageQueryStatement] |
+    -- ^ Run the program on the input path.
     ResponseInputPath InputPath
+    -- ^ Update the GUI because the input path has changed.
 
+-- | A path to folder with image files used as input.
 type InputPath = FilePath
 
+-- | Effect of the given request on the program and responses.
 model :: Model Program Request Response
 model = asPipe (forever (do
     request <- await
@@ -97,9 +114,11 @@ model = asPipe (forever (do
                 put (Program imagequerystatements' inputpath)
                 yield (ResponseProgramChanged imagequerystatements'))))
 
+-- | The GUI.
 gui :: IO ()
 gui = start (do
 
+    -- Channels for interaction between the GUI and the pure model.
     (saveProgramO,saveProgramI)           <- spawn Single
     (loadProgramO,loadProgramI)           <- spawn Single
     (runProgramO,runProgramI)             <- spawn Single
@@ -110,6 +129,7 @@ gui = start (do
     (deleteStatementO,deleteStatementI)   <- spawn Single
     (progressO,progressI)                 <- spawn Single
 
+    -- GUI elements.
     parentFrame           <- frame [text := "Image Processing",position := pt 100 100]
     saveProgramButton     <- createSaveProgramButton parentFrame saveProgramO
     loadProgramButton     <- createLoadProgramButton parentFrame loadProgramO
@@ -121,6 +141,7 @@ gui = start (do
     deleteStatementButton <- createDeleteStatementButton programListBox parentFrame deleteStatementO
     progressText          <- createProgressText parentFrame progressI
 
+    -- Initialize the GUI.
     let wx = managed (\k -> let
 
             inputs = [saveProgramI,loadProgramI,runProgramI,addStatementI,changeInputPathI,deleteStatementI]
@@ -157,10 +178,13 @@ gui = start (do
                     widget inputPathButton,
                     fill (widget inputPathText)])]]
 
+    -- Fork a process with the pure model
     forkIO (runMVC (Program [] ".") model wx >> return ())
 
+    -- Set the layout of the parent frame 'frameLayout'
     set parentFrame [layout := frameLayout])
 
+-- | Create a button to save the program.
 createSaveProgramButton :: Frame () -> Output Request -> IO (Button ())
 createSaveProgramButton parentFrame saveProgramO = button parentFrame attributes where
     attributes = [text := "Save", on command := sendSaveProgramRequest]
@@ -174,6 +198,7 @@ createSaveProgramButton parentFrame saveProgramO = button parentFrame attributes
                 atomically (send saveProgramO (RequestSaveProgram filepath))
                 return ()
 
+-- | Create a button to load a program.
 createLoadProgramButton :: Frame () -> Output Request -> IO (Button ())
 createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes where
     attributes = [text := "Load", on command := sendLoadProgramRequest]
@@ -194,6 +219,7 @@ createLoadProgramButton parentFrame loadProgramO = button parentFrame attributes
                         atomically (send loadProgramO (RequestLoadProgram imagequerystatements'))
                         return ()
 
+-- | Create a list box to hold the current program
 createProgramListBox :: Frame () -> Input [ImageQueryStatement] -> IO (SingleListBox ())
 createProgramListBox parentFrame programChangedI = do
     programListBox <- singleListBox parentFrame [
@@ -213,6 +239,7 @@ createProgramListBox parentFrame programChangedI = do
                         else index]))
     return programListBox
 
+-- | Create a button to run the program.
 createRunProgramButton :: Frame () -> Output Request -> IO (Button ())
 createRunProgramButton parentFrame runProgramO = button parentFrame attributes where
     attributes = [text := "Run", on command := sendRunProgramRequest]
@@ -220,6 +247,7 @@ createRunProgramButton parentFrame runProgramO = button parentFrame attributes w
         atomically (send runProgramO RequestRunProgram)
         return ()
 
+-- | Create a button to delete a statement.
 createDeleteStatementButton :: SingleListBox () -> Frame () -> Output Request -> IO (Button ())
 createDeleteStatementButton programListBox parentFrame deleteStatementO = button parentFrame attributes where
     attributes = [text := "Delete statement", on command := sendDeleteStatementRequest]
@@ -228,6 +256,7 @@ createDeleteStatementButton programListBox parentFrame deleteStatementO = button
         atomically (send deleteStatementO (RequestDeleteStatement index))
         return ()
 
+-- | Create a button to change the input path.
 createInputPathButton :: Frame () -> Output Request -> IO (Button ())
 createInputPathButton parentFrame inputPathO =
     button parentFrame [
@@ -240,6 +269,7 @@ createInputPathButton parentFrame inputPathO =
                     atomically (send inputPathO (RequestInputPath inputpath))
                     return ()]
 
+-- | Create a text field to contain the chosen input path.
 createInputPathText :: Frame () -> Input InputPath -> IO (StaticText ())
 createInputPathText parentFrame inputPathChangedI = do
     inputPathText <- staticText parentFrame [text := "."]
@@ -250,6 +280,7 @@ createInputPathText parentFrame inputPathChangedI = do
             Just inputpath -> Wx.set inputPathText [text := inputpath]))
     return inputPathText
 
+-- | Create a text field to contain the progress.
 createProgressText :: Frame () -> Input (Int,Int) -> IO (StaticText ())
 createProgressText parentFrame progressI = do
     progressText <- staticText parentFrame [text := "Waiting"]
@@ -260,6 +291,7 @@ createProgressText parentFrame progressI = do
             Just (i,n) -> Wx.set progressText [text := "Running: " ++ show i ++ "/" ++ show n]))
     return progressText
 
+-- | Create a panel with various controls and buttons to add program statements.
 createAddStatementPanel :: SingleListBox () -> Frame () -> Output Request -> IO (Panel ())
 createAddStatementPanel programListBox parentFrame addStatementO = do
 
@@ -313,6 +345,7 @@ createAddStatementPanel programListBox parentFrame addStatementO = do
 
     return addStatementPanel
 
+-- | A statement control is an input field that allows to set the arguments of a statement.
 data StatementControl a = StatementControl {unStatementControl :: Panel () -> IO ([Layout],IO a)}
 
 instance Functor StatementControl where
@@ -328,6 +361,8 @@ instance Applicative StatementControl where
             value <- getValue
             return (function value)))
 
+-- | Given a list of names associated with values yields a statement control
+-- that is a drop down menu with the given names.
 choiceControl :: [(String,a)] -> StatementControl a
 choiceControl choices = StatementControl (\parentPanel -> do
     c <- choice parentPanel [items := map fst choices,selection := 0]
@@ -336,6 +371,7 @@ choiceControl choices = StatementControl (\parentPanel -> do
             return (map snd choices !! s)
     return ([widget c],getChoice))
 
+-- | An input field for a number.
 numberControl :: (Read a) => StatementControl a
 numberControl = StatementControl (\parentPanel -> do
     e <- entry parentPanel [text := "0"]
@@ -344,16 +380,20 @@ numberControl = StatementControl (\parentPanel -> do
             return (read n)
     return ([widget e],getNumber))
 
+-- | Give a label to a statement control.
 tag :: String -> StatementControl ()
 tag name = StatementControl (\_ -> do
     return ([label name],return ()))
 
+-- | Average image has no arguments.
 averageImageControl :: StatementControl ImageQueryStatement
 averageImageControl = pure (GetImageQueryResult ImageOfAverage)
 
+-- | Island image has no arguments
 islandImageControl :: StatementControl ImageQueryStatement
 islandImageControl = pure (GetImageQueryResult IslandImage)
 
+-- | Line image has the arguments "orientation", "start x", "start y" and "length".
 lineImageControl :: StatementControl ImageQueryStatement
 lineImageControl =
     (\orientation x y l -> GetImageQueryResult (LineImage orientation x y l)) <$>
@@ -362,17 +402,20 @@ lineImageControl =
     (tag "start y:" *> numberControl) <*>
     (tag "length:" *> numberControl)
 
+-- | Area histogram has the arguments "bin size" and "exponent"
 areaHistogramControl :: StatementControl ImageQueryStatement
 areaHistogramControl = 
     (\binsize power -> GetImageQueryResult (AreaHistogram binsize power)) <$>
     (tag "bin size:" *> numberControl) <*>
     (tag "exponent" *> choiceControl [("One",One),("One over two",OneOverTwo),("Three over two",ThreeOverTwo)])
 
+-- | Channel choice has one argument "color".
 channelControl :: StatementControl ImageQueryStatement
 channelControl =
     SetImageQueryParameter . Channel <$>
     choiceControl [("Red",Red),("Green",Green),("Blue",Blue)]
 
+-- | Subrect choice has four arguments "upper left x", "upper left y", "width" and "height"
 subrectControl :: StatementControl ImageQueryStatement
 subrectControl =
     (\x y w h -> SetImageQueryParameter (SubRect (x,y,w,h))) <$>
@@ -381,6 +424,7 @@ subrectControl =
     (tag "width" *> numberControl) <*>
     (tag "height" *> numberControl)
 
+-- | Stencil choice prompts the user to choose an input image
 stencilControl :: StatementControl ImageQueryStatement
 stencilControl = StatementControl (\parentPanel -> do
     let getStatement = do
@@ -399,27 +443,32 @@ stencilControl = StatementControl (\parentPanel -> do
                         return (SetImageQueryParameter (StencilImage "" Nothing)))
     return ([],getStatement))
 
+-- | Threshold choice has a single number argument.
 thresholdControl :: StatementControl ImageQueryStatement
 thresholdControl =
     SetImageQueryParameter . Threshold <$>
     numberControl
 
+-- | Smoothing choice has a single number argument.
 smoothingControl :: StatementControl ImageQueryStatement
 smoothingControl =
     SetImageQueryParameter . Smoothing <$>
     (tag "half width:" *> numberControl)
 
+-- | Polarity is the choice between dark islands and bright islands.
 polarityControl :: StatementControl ImageQueryStatement
 polarityControl =
     SetImageQueryParameter . Polarity <$>
     choiceControl [("Dark",Dark),("Bright",Bright)]
 
+-- | Query for a value at a point has two arguments "x" and "y"
 valueInPointControl :: StatementControl ImageQueryStatement
 valueInPointControl =
     (\x y -> GetImageQueryResult (TableQuery (ValueInPoint x y))) <$>
     (tag "x:" *> numberControl) <*>
     (tag "y:" *> numberControl)
 
+-- | Query for the average around a point has three arguments "x", "y" and "half width".
 averageAroundPointControl :: StatementControl ImageQueryStatement
 averageAroundPointControl =
     (\x y r -> GetImageQueryResult (TableQuery (AverageAroundPoint x y r))) <$>
@@ -427,9 +476,11 @@ averageAroundPointControl =
     (tag "y:" *> numberControl) <*>
     (tag "half width:" *> numberControl)
 
+-- | Average image has no arguments.
 averageOfImageControl :: StatementControl ImageQueryStatement
 averageOfImageControl = pure (GetImageQueryResult (TableQuery AverageOfImage))
 
+-- | Queries concerning islands are a choice of "number", "average area" and "average outline"
 islandQueryControl :: StatementControl ImageQueryStatement
 islandQueryControl =
     GetImageQueryResult . TableQuery . IslandQuery <$>

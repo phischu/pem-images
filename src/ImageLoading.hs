@@ -15,6 +15,7 @@ import System.FilePath ((</>))
 import Control.Exception (Exception,throw)
 import Data.Typeable (Typeable)
 
+-- | Produce pairs of paths and images for all images in the given path.
 imageSeries :: FilePath -> Producer (FilePath,Image RGB) IO ()
 imageSeries seriespath =
     filesInDirectory seriespath >->
@@ -22,6 +23,7 @@ imageSeries seriespath =
         image <- loadImage imagepath
         return (imagepath,juicyToImage image))
 
+-- | An error during image loading.
 data ImageLoadingError =
     ImageLoadingError String String deriving (Typeable)
 
@@ -30,11 +32,13 @@ instance Show ImageLoadingError where
 
 instance Exception ImageLoadingError
 
+-- | Produce all files in the given directory.
 filesInDirectory :: FilePath -> Producer FilePath IO ()
 filesInDirectory directorypath = do
     directorycontents <- liftIO (getDirectoryContents directorypath)
     each directorycontents >-> Pipes.map (directorypath </>) >-> Pipes.filterM (liftIO . doesFileExist)
 
+-- | Load an image from the given filepath.
 loadImage :: FilePath -> IO (Juicy.Image Juicy.PixelRGB8)
 loadImage imagepath = do
     eitherdynamicimage <- readImage imagepath
